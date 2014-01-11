@@ -15,7 +15,6 @@ class Device
 private:
 	int sock;
 	int devID;
-	bool isRunning;
 
 	bool alreadyPromisc;
 	char devName[IFNAMSIZ];

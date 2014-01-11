@@ -6,13 +6,21 @@
  */
 
 #include "socket.hh"
+#include "packet.hh"
 #include <unistd.h>
+#include <arpa/inet.h>
+#include <iostream>
+
+using namespace std;
 
 int main()
 {
-	Device eth1("eth1");
-	Device eth2("eth2");
+	Packet temp(1024);
 
-	sleep(5);
+	int data = htonl(43214343);
+	temp.setData(&data, sizeof(int));
+
+	for(int k=0; k<32; k++)
+		cout<<temp.readBit(k);
 	return 0;
 }

@@ -22,9 +22,8 @@
 Device::Device(const char* devName)
 {
 	sock = -1;
-	isRunning = false;
 	devID = -1;
-	alreadyPromisc = false;
+	alreadyPromisc = true;
 
 
 	sock = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ALL));
@@ -94,4 +93,5 @@ Device::~Device()
 		sock = -1;
 	}
 }
+
 
