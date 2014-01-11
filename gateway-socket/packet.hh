@@ -41,21 +41,7 @@ public:
 	int getCapacity();
 	int setData(void* data, int length);
 
-	friend class Device;
-};
-
-
-class PacketPool
-{
-private:
-	std::queue<Packet*> availablePackets;
-
-public:
-	PacketPool(int count, int MTU);
-	~PacketPool();
-
-	Packet* getPacket();
-	void returnPacket(Packet*);
+	friend class Gateway;
 };
 
 #endif /* PACKET_HH_ */

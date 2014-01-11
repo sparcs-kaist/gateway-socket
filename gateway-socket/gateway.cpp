@@ -6,12 +6,16 @@
  */
 
 #include "gateway.hh"
+#include "packet.hh"
 
 #include <sys/eventfd.h>
 #include <event.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <net/ethernet.h>
+#include <net/if_arp.h>
+#include <memory.h>
 
 static void terminate_gateway(int fd, short what, void *arg)
 {
@@ -67,10 +71,37 @@ Gateway::~Gateway()
 
 void Gateway::serve(void)
 {
+	Packet inPacket(MTU);
+	Packet outPacket(MTU);
+
+
 	while(!event_base_got_exit(evbase))
 	{
-		sleep(1);
-		printf("sleep\n");
+		int inBurst, outBurst;
+		for(inBurst = 0; inBurst < IO_BURST; inBurst++)
+		{
+			int readLen = inDev->readPacket(inPacket.memory,MTU);
+			if(readLen == -1)
+				break;
+			if(readLen > MTU)
+				continue;
+
+			struct ether_header header;
+			if(readLen < (int)sizeof(header))
+				continue;
+
+			printf("in read %d\n", readLen);
+
+			inPacket.setLength(readLen);
+			inPacket.readByteArray(0, sizeof(header), &header);
+
+			int written = outDev->writePacket(inPacket.memory, inPacket.getLength());
+			if(written > 0) printf("in written %d\n", written);
+		}
+
+
+		if(inBurst == 0 && outBurst == 0);
+			usleep(1);
 		event_base_loop(evbase, EVLOOP_NONBLOCK);
 	}
 }

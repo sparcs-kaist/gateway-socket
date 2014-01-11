@@ -19,13 +19,11 @@ private:
 	bool alreadyPromisc;
 	char devName[IFNAMSIZ];
 
-
-
-
 public:
 	Device(const char* devName);
 	~Device();
 	int readPacket(void* buffer, int length);
+	int writePacket(const void* buffer, int length);
 };
 
 

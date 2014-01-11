@@ -73,3 +73,12 @@ void Packet::writeByte(int index, uint8_t data)
 	memory[index] = data;
 }
 
+void Packet::setLength(int length)
+{
+	writtenByte = length;
+}
+
+int Packet::getLength()
+{
+	return writtenByte;
+}

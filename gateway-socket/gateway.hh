@@ -9,6 +9,8 @@
 #define GATEWAY_HH_
 
 #include "socket.hh"
+#define MTU 1500
+#define IO_BURST 32
 
 class Gateway
 {

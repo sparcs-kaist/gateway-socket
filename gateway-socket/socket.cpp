@@ -18,6 +18,7 @@
 #include <string.h>
 #include <memory.h>
 #include <stdlib.h>
+#include <sys/socket.h>
 
 Device::Device(const char* devName)
 {
@@ -26,7 +27,7 @@ Device::Device(const char* devName)
 	alreadyPromisc = true;
 
 
-	sock = socket(PF_PACKET, SOCK_PACKET, htons(ETH_P_ALL));
+	sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
 	if(sock < 0)
 	{
 		perror("cannot open packet socket");
@@ -51,6 +52,16 @@ Device::Device(const char* devName)
 	if((alreadyPromisc = ((request.ifr_flags & IFF_PROMISC) > 0)))
 	{
 		printf("Already in promiscuous mode (%s).\n", devName);
+		if(1)
+		{
+			request.ifr_flags &= ~IFF_PROMISC;
+			if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
+			{
+				perror ("cannot set dev");
+				close(sock);
+				exit(1);
+			}
+		}
 	}
 	else
 	{
@@ -67,6 +78,22 @@ Device::Device(const char* devName)
 	if (ioctl(sock, SIOCGIFINDEX, &request) < 0)
 	{
 		perror ("cannot get dev index");
+		close(sock);
+		exit(1);
+	}
+	devID = request.ifr_ifindex;
+
+	struct sockaddr_ll eth;
+	memset(&eth, 0, sizeof(eth));
+
+	//For bind only sll_protocol and sll_ifindex are used.
+	printf("dev %d\n", devID);
+	eth.sll_family = AF_PACKET;
+	eth.sll_protocol = htons(ETH_P_ALL);
+	eth.sll_ifindex = devID;
+	if(bind(sock, (struct sockaddr*)&eth, sizeof(eth)) < 0)
+	{
+		perror ("cannot bind dev");
 		close(sock);
 		exit(1);
 	}
@@ -99,4 +126,7 @@ int Device::readPacket(void* buffer, int length)
 	return recv(sock, buffer, length, MSG_DONTWAIT | MSG_TRUNC);
 }
 
-
+int Device::writePacket(const void* buffer, int length)
+{
+	return send(sock, buffer, length, MSG_DONTWAIT);
+}
