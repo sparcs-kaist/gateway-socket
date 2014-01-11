@@ -10,6 +10,8 @@
 #include <sys/socket.h>
 #include <netpacket/packet.h>
 #include <net/ethernet.h>
+#include <net/if_packet.h>
+#include <net/if_arp.h>
 #include <arpa/inet.h>
 #include <error.h>
 #include <stdio.h>
@@ -24,7 +26,7 @@ Device::Device(const char* devName)
 {
 	sock = -1;
 	devID = -1;
-	alreadyPromisc = true;
+	prevFlag = 0;
 
 
 	sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
@@ -49,29 +51,15 @@ Device::Device(const char* devName)
 		exit(1);
 	}
 
-	if((alreadyPromisc = ((request.ifr_flags & IFF_PROMISC) > 0)))
+	prevFlag = request.ifr_flags;
+
+
+	request.ifr_flags = IFF_UP | IFF_BROADCAST | IFF_POINTOPOINT | IFF_NOTRAILERS | IFF_NOARP | IFF_PROMISC;
+	if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
 	{
-		printf("Already in promiscuous mode (%s).\n", devName);
-		if(1)
-		{
-			request.ifr_flags &= ~IFF_PROMISC;
-			if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
-			{
-				perror ("cannot set dev");
-				close(sock);
-				exit(1);
-			}
-		}
-	}
-	else
-	{
-		request.ifr_flags |= IFF_PROMISC;
-		if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
-		{
-			perror ("cannot set dev");
-			close(sock);
-			exit(1);
-		}
+		perror ("cannot set dev");
+		close(sock);
+		exit(1);
 	}
 
 
@@ -103,18 +91,15 @@ Device::~Device()
 {
 	if(sock > 0)
 	{
-		if(!alreadyPromisc)
-		{
-			struct ifreq request;
-			memset(&request, 0, sizeof(request));
 
-			strncpy(request.ifr_name, devName, IFNAMSIZ);
-			if(ioctl(sock, SIOCGIFFLAGS, &request) == 0)
-			{
-				request.ifr_flags &= ~IFF_PROMISC;
-				ioctl(sock, SIOCSIFFLAGS, &request);
-			}
-		}
+		struct ifreq request;
+		memset(&request, 0, sizeof(request));
+
+		strncpy(request.ifr_name, devName, IFNAMSIZ);
+		printf("recover prev setting of %s\n", request.ifr_name);
+		request.ifr_flags = prevFlag;
+		ioctl(sock, SIOCSIFFLAGS, &request);
+
 
 		close(sock);
 		sock = -1;
@@ -123,10 +108,37 @@ Device::~Device()
 
 int Device::readPacket(void* buffer, int length)
 {
-	return recv(sock, buffer, length, MSG_DONTWAIT | MSG_TRUNC);
+	while(true)
+	{
+		struct sockaddr_ll eth;
+		memset(&eth, 0, sizeof(eth));
+		socklen_t len = sizeof(eth);
+		int readByte = recvfrom(sock, buffer, length, MSG_DONTWAIT | MSG_TRUNC, (struct sockaddr*)&eth, &len);
+		if(readByte < 0)
+			return readByte;
+		if(len > sizeof(eth))
+			continue;
+		if(eth.sll_ifindex != this->devID)
+			continue;
+
+		return readByte;
+	}
+	return -1;
 }
 
 int Device::writePacket(const void* buffer, int length)
 {
-	return send(sock, buffer, length, MSG_DONTWAIT);
+	struct sockaddr_ll eth;
+	memset(&eth, 0, sizeof(eth));
+	socklen_t len = sizeof(eth);
+
+	eth.sll_family = AF_PACKET;
+	eth.sll_protocol = htons(ARPHRD_IEEE802);
+	eth.sll_ifindex = devID;
+	eth.sll_hatype = ARPHRD_ETHER;
+	eth.sll_pkttype = PACKET_OUTGOING;
+	eth.sll_halen = ETH_ALEN;
+	memcpy(eth.sll_addr, buffer, ETH_ALEN);
+
+	return sendto(sock, buffer, length, 0, (struct sockaddr*)&eth, len);
 }

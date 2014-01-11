@@ -64,6 +64,8 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 
 Gateway::~Gateway()
 {
+	delete inDev;
+	delete outDev;
 	close(termEventFD);
 	close(addUserEventFD);
 	close(delUserEventFD);
@@ -73,6 +75,9 @@ void Gateway::serve(void)
 {
 	Packet inPacket(MTU);
 	Packet outPacket(MTU);
+
+	const unsigned char broadcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
+	const unsigned char me[6] = {0x90,0x2B,0x34,0x58,0xE4,0x15};
 
 
 	while(!event_base_got_exit(evbase))
@@ -90,17 +95,50 @@ void Gateway::serve(void)
 			if(readLen < (int)sizeof(header))
 				continue;
 
-			printf("in read %d\n", readLen);
-
 			inPacket.setLength(readLen);
 			inPacket.readByteArray(0, sizeof(header), &header);
 
+
 			int written = outDev->writePacket(inPacket.memory, inPacket.getLength());
-			if(written > 0) printf("in written %d\n", written);
+
+			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (in) => %02X:%02X:%02X:%02X:%02X:%02X (out) : %d bytes\n",
+								header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
+								header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
+								header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
+								header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
+								written);
+
+		}
+
+		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
+		{
+			int readLen = outDev->readPacket(outPacket.memory,MTU);
+			if(readLen == -1)
+				break;
+			if(readLen > MTU)
+				continue;
+
+			struct ether_header header;
+			if(readLen < (int)sizeof(header))
+				continue;
+
+			outPacket.setLength(readLen);
+			outPacket.readByteArray(0, sizeof(header), &header);
+			if(memcmp(header.ether_shost, me, 6) == 0)
+				continue;
+
+			int written = inDev->writePacket(outPacket.memory, outPacket.getLength());
+
+			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (out) => %02X:%02X:%02X:%02X:%02X:%02X (in) : %d bytes\n",
+					header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
+					header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
+					header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
+					header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
+					written);
 		}
 
 
-		if(inBurst == 0 && outBurst == 0);
+		if((inBurst == 0) && (outBurst == 0))
 			usleep(1);
 		event_base_loop(evbase, EVLOOP_NONBLOCK);
 	}

@@ -16,7 +16,7 @@ private:
 	int sock;
 	int devID;
 
-	bool alreadyPromisc;
+	unsigned int prevFlag;
 	char devName[IFNAMSIZ];
 
 public:
