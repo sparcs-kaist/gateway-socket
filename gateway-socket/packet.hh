@@ -21,7 +21,7 @@ class Packet
 private:
 	int writtenByte;
 	int capacity;
-	char* memory;
+	unsigned char* memory;
 
 
 	void setLength(int length);
@@ -35,10 +35,10 @@ public:
 	void writeBit(int index, bool flag);
 
 	int readByte(int index);
-	int writeByte(int index, uint8_t data);
+	void writeByte(int index, uint8_t data);
 
-	int readByteArray(int from, int to, void* buffer);
-	int writeByteArray(int from, int to, const void* buffer);
+	void readByteArray(int from, int to, void* buffer);
+	void writeByteArray(int from, int to, const void* buffer);
 
 
 	int getLength();

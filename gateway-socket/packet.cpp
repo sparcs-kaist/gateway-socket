@@ -14,7 +14,7 @@ Packet::Packet(int capacity)
 {
 	this->writtenByte = 0;
 	this->capacity = capacity;
-	this->memory = (char*)malloc(capacity);
+	this->memory = (unsigned char*)malloc(capacity);
 	if(memory == 0)
 	{
 		printf("No memory\n");
@@ -54,11 +54,22 @@ bool Packet::readBit(int index)
 	return (target & probe) > 0;
 }
 
-/*
 
-int Packet::readByteArray(int from, int to, void* buffer);
-int Packet::writeByteArray(int from, int to, const void* buffer);
+void Packet::readByteArray(int from, int to, void* buffer)
+{
+	memcpy(buffer, memory+from, to-from);
+}
+void Packet::writeByteArray(int from, int to, const void* buffer)
+{
+	memcpy(memory+from, buffer, to-from);
+}
 
-int Packet::readByte(int index);
-int Packet::writeByte(int index, uint8_t data);
-*/
+int Packet::readByte(int index)
+{
+	return memory[index];
+}
+void Packet::writeByte(int index, uint8_t data)
+{
+	memory[index] = data;
+}
+
