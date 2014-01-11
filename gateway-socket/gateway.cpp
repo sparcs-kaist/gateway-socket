@@ -77,7 +77,6 @@ void Gateway::serve(void)
 	Packet outPacket(MTU);
 
 	const unsigned char broadcast[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-	const unsigned char me[6] = {0x90,0x2B,0x34,0x58,0xE4,0x15};
 
 
 	while(!event_base_got_exit(evbase))
@@ -101,12 +100,14 @@ void Gateway::serve(void)
 
 			int written = outDev->writePacket(inPacket.memory, inPacket.getLength());
 
+			/*
 			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (in) => %02X:%02X:%02X:%02X:%02X:%02X (out) : %d bytes\n",
-								header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
-								header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
-								header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
-								header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
-								written);
+					header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
+					header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
+					header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
+					header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
+					written);
+			*/
 
 		}
 
@@ -124,17 +125,17 @@ void Gateway::serve(void)
 
 			outPacket.setLength(readLen);
 			outPacket.readByteArray(0, sizeof(header), &header);
-			if(memcmp(header.ether_shost, me, 6) == 0)
-				continue;
 
 			int written = inDev->writePacket(outPacket.memory, outPacket.getLength());
 
+			/*
 			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (out) => %02X:%02X:%02X:%02X:%02X:%02X (in) : %d bytes\n",
 					header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
 					header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
 					header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
 					header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
 					written);
+					*/
 		}
 
 

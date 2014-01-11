@@ -75,9 +75,7 @@ Device::Device(const char* devName)
 	memset(&eth, 0, sizeof(eth));
 
 	//For bind only sll_protocol and sll_ifindex are used.
-	printf("dev %d\n", devID);
 	eth.sll_family = AF_PACKET;
-	eth.sll_protocol = htons(ETH_P_ALL);
 	eth.sll_ifindex = devID;
 	if(bind(sock, (struct sockaddr*)&eth, sizeof(eth)) < 0)
 	{
@@ -133,7 +131,7 @@ int Device::writePacket(const void* buffer, int length)
 	socklen_t len = sizeof(eth);
 
 	eth.sll_family = AF_PACKET;
-	eth.sll_protocol = htons(ARPHRD_IEEE802);
+	eth.sll_protocol = htons(ARPHRD_ETHER);
 	eth.sll_ifindex = devID;
 	eth.sll_hatype = ARPHRD_ETHER;
 	eth.sll_pkttype = PACKET_OUTGOING;
