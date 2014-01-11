@@ -94,4 +94,9 @@ Device::~Device()
 	}
 }
 
+int Device::readPacket(void* buffer, int length)
+{
+	return recv(sock, buffer, length, MSG_DONTWAIT | MSG_TRUNC);
+}
+
 

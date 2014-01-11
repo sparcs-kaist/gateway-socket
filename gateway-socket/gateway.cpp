@@ -15,12 +15,15 @@ using namespace std;
 
 int main()
 {
-	Packet temp(1024);
+	Device eth2("eth2");
+	char buffer[64];
 
-	int data = htonl(43214343);
-	temp.setData(&data, sizeof(int));
-
-	for(int k=0; k<32; k++)
-		cout<<temp.readBit(k);
+	for(int k=0; k<1000; k++)
+	{
+		int ret = eth2.readPacket(buffer, sizeof(buffer));
+		printf("packet recved %d\n", ret);
+		if(ret == -1)
+			usleep(10);
+	}
 	return 0;
 }

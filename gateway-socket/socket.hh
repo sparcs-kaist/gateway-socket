@@ -25,6 +25,7 @@ private:
 public:
 	Device(const char* devName);
 	~Device();
+	int readPacket(void* buffer, int length);
 };
 
 

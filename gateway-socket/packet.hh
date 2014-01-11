@@ -10,11 +10,7 @@
 
 #include <stdint.h>
 #include "socket.hh"
-
-class PacketPool
-{
-
-};
+#include <queue>
 
 class Packet
 {
@@ -48,5 +44,18 @@ public:
 	friend class Device;
 };
 
+
+class PacketPool
+{
+private:
+	std::queue<Packet*> availablePackets;
+
+public:
+	PacketPool(int count, int MTU);
+	~PacketPool();
+
+	Packet* getPacket();
+	void returnPacket(Packet*);
+};
 
 #endif /* PACKET_HH_ */
