@@ -15,8 +15,10 @@ class Ethernet
 {
 private:
 	Packet* packet;
+	int offset;
 public:
 	Ethernet(Packet* packet);
+	Ethernet(Packet* packet, int offset);
 
 	struct ether_addr getSource();
 	struct ether_addr getDestination();
@@ -26,6 +28,7 @@ public:
 
 	u_int16_t getProtocol();
 	void setProtocol(u_int16_t protocol_host);
+	int getNextOffset();
 
 	static char* printMAC(struct ether_addr, char* buf, int len);
 
