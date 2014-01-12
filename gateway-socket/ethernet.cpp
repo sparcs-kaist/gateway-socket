@@ -5,7 +5,7 @@
  *      Author: leeopop
  */
 
-#include "protocol.hh"
+#include "ethernet.hh"
 #include <stdio.h>
 #include <arpa/inet.h>
 

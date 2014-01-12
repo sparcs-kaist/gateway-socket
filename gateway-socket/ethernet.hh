@@ -1,12 +1,12 @@
 /*
- * protocol.hh
+ * ethernet.hh
  *
  *  Created on: 2014. 1. 12.
  *      Author: leeopop
  */
 
-#ifndef PROTOCOL_HH_
-#define PROTOCOL_HH_
+#ifndef ETHERNET_HH_
+#define ETHERNET_HH_
 
 #include <net/ethernet.h>
 #include "packet.hh"
@@ -36,4 +36,4 @@ public:
 };
 
 
-#endif /* PROTOCOL_HH_ */
+#endif /* ETHERNET_HH_ */
