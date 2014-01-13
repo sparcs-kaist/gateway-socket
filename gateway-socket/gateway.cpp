@@ -238,7 +238,7 @@ void Gateway::serve(void)
 			if(readLen > MTU)
 				continue;
 
-			Packet* packet = &inPacket;
+			Packet* packet = &outPacket;
 			Ethernet ethernet(packet);
 			if(ethernet.getProtocol() == ETHERTYPE_ARP)
 			{

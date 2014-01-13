@@ -7,6 +7,7 @@ CPP_SRCS += \
 ../arp.cpp \
 ../ethernet.cpp \
 ../gateway.cpp \
+../ip.cpp \
 ../main.cpp \
 ../packet.cpp \
 ../socket.cpp 
@@ -15,6 +16,7 @@ OBJS += \
 ./arp.o \
 ./ethernet.o \
 ./gateway.o \
+./ip.o \
 ./main.o \
 ./packet.o \
 ./socket.o 
@@ -23,6 +25,7 @@ CPP_DEPS += \
 ./arp.d \
 ./ethernet.d \
 ./gateway.d \
+./ip.d \
 ./main.d \
 ./packet.d \
 ./socket.d 
