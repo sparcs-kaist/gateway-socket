@@ -20,14 +20,15 @@
 
 using namespace std;
 
-static int exit_event = -1;
+static Gateway* gateway;
 
 static void exit_handle(int num)
 {
-	printf("Exiting...(%d)\n", exit_event);
+	printf("Exiting...\n");
 	fflush(0);
-	eventfd_t v = 1;
-	eventfd_write(exit_event, v);
+
+	gateway->terminate();
+	gateway = 0;
 }
 
 static void* serve(void* arg)
@@ -42,13 +43,12 @@ static void* serve(void* arg)
 int main()
 {
 	signal(SIGINT, exit_handle);
-	Gateway* gateway = new Gateway("eth1", "eth2");
-	exit_event = gateway->getTermFD();
+	gateway = new Gateway("eth1", "eth2");
 	pthread_t main_thread;
 
 	gateway->serve();
-	//pthread_create(&main_thread, 0, serve, gateway);
-	//pthread_join(main_thread, 0);
+	pthread_create(&main_thread, 0, serve, gateway);
+	pthread_join(main_thread, 0);
 
 	delete gateway;
 	return 0;

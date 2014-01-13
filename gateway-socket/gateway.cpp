@@ -7,6 +7,7 @@
 
 #include "gateway.hh"
 #include "packet.hh"
+#include "ethernet.hh"
 
 #include <sys/eventfd.h>
 #include <event.h>
@@ -16,6 +17,12 @@
 #include <net/ethernet.h>
 #include <net/if_arp.h>
 #include <memory.h>
+#include <queue>
+#include <unordered_map>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+using namespace std;
 
 static void terminate_gateway(int fd, short what, void *arg)
 {
@@ -27,11 +34,32 @@ static void terminate_gateway(int fd, short what, void *arg)
 	event_base_loopexit(evbase, NULL);
 }
 
+void Gateway::add_static_ip(int fd, short what, void *arg)
+{
+	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->lock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
+	gateway->staticIPAddRequest.pop();
+
+	gateway->staticIPMap.erase(data.first.s_addr);
+	gateway->staticIPMap.insert(pair<uint32_t, struct ether_addr>(data.first.s_addr, data.second));
+
+	char ip_str[32];
+	char mac_str[32];
+	inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
+	Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
+	printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
+	pthread_mutex_unlock(&gateway->lock);
+}
+
 Gateway::Gateway(const char* inDev, const char* outDev)
 {
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
 
+	pthread_mutex_init(&this->lock, NULL);
 
 	termEventFD = eventfd(0,0);
 	if(termEventFD < 0)
@@ -39,14 +67,14 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 		printf("cannot create term event\n");
 		exit(1);
 	}
-	addUserEventFD = eventfd(0,0);
-	if(addUserEventFD < 0)
+	addStaticIPEventFD = eventfd(0,0);
+	if(addStaticIPEventFD < 0)
 	{
 		printf("cannot create add event\n");
 		exit(1);
 	}
-	delUserEventFD = eventfd(0,0);
-	if(delUserEventFD < 0)
+	delStaticIPEventFD = eventfd(0,0);
+	if(delStaticIPEventFD < 0)
 	{
 		printf("cannot create del event\n");
 		exit(1);
@@ -64,11 +92,12 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 
 Gateway::~Gateway()
 {
+	pthread_mutex_destroy(&this->lock);
 	delete inDev;
 	delete outDev;
 	close(termEventFD);
-	close(addUserEventFD);
-	close(delUserEventFD);
+	close(addStaticIPEventFD);
+	close(delStaticIPEventFD);
 }
 
 void Gateway::serve(void)
@@ -98,17 +127,7 @@ void Gateway::serve(void)
 			inPacket.readByteArray(0, sizeof(header), &header);
 
 
-			int written = outDev->writePacket(inPacket.memory, inPacket.getLength());
-
-			/*
-			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (in) => %02X:%02X:%02X:%02X:%02X:%02X (out) : %d bytes\n",
-					header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
-					header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
-					header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
-					header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
-					written);
-			*/
-
+			outDev->writePacket(inPacket.memory, inPacket.getLength());
 		}
 
 		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
@@ -126,16 +145,7 @@ void Gateway::serve(void)
 			outPacket.setLength(readLen);
 			outPacket.readByteArray(0, sizeof(header), &header);
 
-			int written = inDev->writePacket(outPacket.memory, outPacket.getLength());
-
-			/*
-			printf("gateway: %02X:%02X:%02X:%02X:%02X:%02X (out) => %02X:%02X:%02X:%02X:%02X:%02X (in) : %d bytes\n",
-					header.ether_shost[0], header.ether_shost[1], header.ether_shost[2],
-					header.ether_shost[3], header.ether_shost[4], header.ether_shost[5],
-					header.ether_dhost[0], header.ether_dhost[1], header.ether_dhost[2],
-					header.ether_dhost[3], header.ether_dhost[4], header.ether_dhost[5],
-					written);
-					*/
+			inDev->writePacket(outPacket.memory, outPacket.getLength());
 		}
 
 
@@ -145,15 +155,22 @@ void Gateway::serve(void)
 	}
 }
 
-int Gateway::getTermFD()
+void Gateway::terminate()
 {
-	return termEventFD;
+	eventfd_t v = 1;
+	eventfd_write(this->termEventFD, v);
 }
-int Gateway::getAddFD()
+
+void Gateway::addStaticIP(struct in_addr ip, struct ether_addr mac)
 {
-	return addUserEventFD;
+	pthread_mutex_lock(&this->lock);
+	this->staticIPAddRequest.push(pair<struct in_addr, struct ether_addr>(ip, mac));
+	eventfd_t v = 1;
+	eventfd_write(this->addStaticIPEventFD, v);
+	pthread_mutex_unlock(&this->lock);
 }
-int Gateway::getDelFD()
+
+void Gateway::delStaticIP(struct in_addr ip)
 {
-	return delUserEventFD;
+
 }
