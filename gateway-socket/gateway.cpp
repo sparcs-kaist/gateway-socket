@@ -214,12 +214,42 @@ void Gateway::serve(void)
 			if(readLen > MTU)
 				continue;
 
-			struct ether_header header;
-			if(readLen < (int)sizeof(header))
-				continue;
+			Packet* packet = &inPacket;
+			Ethernet ethernet(packet);
+			if(ethernet.getProtocol() == ETHERTYPE_ARP)
+			{
+				ARP arp(packet, ethernet.getNextOffset());
+				struct arphdr arp_header = arp.getHeader();
 
-			outPacket.setLength(readLen);
-			outPacket.readByteArray(0, sizeof(header), &header);
+				if (! (
+						(arp_header.ar_hrd == ARPHRD_ETHER) &&
+						(arp_header.ar_pro == ETHERTYPE_IP) &&
+						(arp_header.ar_op == ARPOP_InREQUEST || ARPOP_InREPLY) &&
+						(arp_header.ar_pln == sizeof(struct in_addr)) &&
+						(arp_header.ar_hln == sizeof(struct ether_addr))
+				) )
+				{
+					//filter out
+					continue;
+				}
+
+				if(arp_header.ar_op == ARPOP_REPLY)
+				{
+					struct in_addr srcIP = arp.getSourceIP();
+					StaticIPMap::const_iterator static_iter
+					= this->staticIPMap.find(srcIP.s_addr);
+
+					if(static_iter != staticIPMap.end())
+					{
+						//someone is using our IP
+						continue;
+					}
+				}
+			}
+			else if(ethernet.getProtocol() == ETHERTYPE_IP)
+			{
+
+			}
 
 			inDev->writePacket(outPacket.memory, outPacket.getLength());
 		}
