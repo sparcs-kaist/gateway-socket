@@ -43,7 +43,8 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
 	gateway->staticIPAddRequest.pop();
 
-	gateway->staticIPMap.erase(data.first.s_addr);
+	if(gateway->staticIPMap.size() > 0)
+		gateway->staticIPMap.erase(data.first.s_addr);
 	gateway->staticIPMap.insert(pair<uint32_t, struct ether_addr>(data.first.s_addr, data.second));
 
 	char ip_str[32];
