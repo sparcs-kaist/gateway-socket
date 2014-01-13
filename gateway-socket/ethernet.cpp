@@ -103,14 +103,14 @@ void Ethernet::setDestination(struct ether_addr addr)
 u_int16_t Ethernet::getProtocol()
 {
 	uint16_t proto = 0;
-	packet->readByteArray(offset + ETH_ALEN+ETH_ALEN, offset + ETH_ALEN+ETH_ALEN+4, &proto);
+	packet->readByteArray(offset + ETH_ALEN+ETH_ALEN, offset + ETH_ALEN+ETH_ALEN+2, &proto);
 	proto = ntohs(proto);
 	return proto;
 }
 void Ethernet::setProtocol(u_int16_t protocol_host)
 {
 	uint16_t proto = htons(protocol_host);
-	packet->writeByteArray(offset + ETH_ALEN+ETH_ALEN, offset + ETH_ALEN+ETH_ALEN+4, &proto);
+	packet->writeByteArray(offset + ETH_ALEN+ETH_ALEN, offset + ETH_ALEN+ETH_ALEN+2, &proto);
 }
 
 int Ethernet::getNextOffset()
