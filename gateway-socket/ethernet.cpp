@@ -10,8 +10,6 @@
 #include <arpa/inet.h>
 #include <memory.h>
 
-const ether_addr Ethernet::BROADCAST_ADDR = { {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} };
-
 Ethernet::Ethernet(Packet* packet)
 {
 	this->packet = packet;

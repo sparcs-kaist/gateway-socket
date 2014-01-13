@@ -42,7 +42,7 @@ private:
 	std::queue<struct in_addr> staticIPDelRequest;
 	boost::unordered_map<uint32_t, struct ether_addr> staticIPMap;
 
-	boost::unordered_map<uint32_t, struct userInfo*> staticIPUser;
+	boost::unordered_map<uint32_t, struct userInfo*> userMap;
 
 	static void add_static_ip(int fd, short what, void *arg);
 	static void del_static_ip(int fd, short what, void *arg);
