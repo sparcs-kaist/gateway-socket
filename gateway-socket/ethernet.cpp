@@ -8,6 +8,7 @@
 #include "ethernet.hh"
 #include <stdio.h>
 #include <arpa/inet.h>
+#include <memory.h>
 
 const ether_addr Ethernet::BROADCAST_ADDR = { {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF} };
 
@@ -42,6 +43,54 @@ char* Ethernet::printMAC(struct ether_addr addr, char* buf, int len)
 			addr.ether_addr_octet[0], addr.ether_addr_octet[1], addr.ether_addr_octet[2],
 			addr.ether_addr_octet[3], addr.ether_addr_octet[4], addr.ether_addr_octet[5]);
 	return buf;
+}
+
+static int hex_to_byte(unsigned char hex)
+{
+	if(hex >= 'a' && hex <= 'f')
+		return hex + 10 - 'a';
+	if(hex >= 'A' && hex <= 'F')
+		return hex + 10 - 'A';
+	if(hex >= '0' && hex <= '9')
+		return hex - '0';
+	return -1;
+}
+
+struct ether_addr Ethernet::readMAC(const char* buf)
+{
+	struct ether_addr temp;
+	memset(&temp, 0, sizeof(temp));
+	unsigned char* start = (unsigned char*)&temp;
+	unsigned char* end = start + sizeof(temp);
+	bool go_next = false;
+	while(start < end)
+	{
+		if(!go_next)
+		{
+			int ret = hex_to_byte(*(buf++));
+			if(ret == -1)
+			{
+				continue;
+			}
+			unsigned char current = (unsigned char)ret;
+			current = current << 4;
+			*start |= current;
+			go_next = true;
+		}
+		else
+		{
+			int ret = hex_to_byte(*(buf++));
+			if(ret == -1)
+			{
+				continue;
+			}
+			unsigned char current = (unsigned char)ret;
+			*start |= current;
+			go_next = false;
+			start++;
+		}
+	}
+	return temp;
 }
 
 void Ethernet::setSource(struct ether_addr addr)

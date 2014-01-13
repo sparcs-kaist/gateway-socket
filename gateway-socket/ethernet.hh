@@ -31,6 +31,7 @@ public:
 	int getNextOffset();
 
 	static char* printMAC(struct ether_addr, char* buf, int len);
+	static struct ether_addr readMAC(const char* buf);
 
 	static const struct ether_addr BROADCAST_ADDR;
 };
