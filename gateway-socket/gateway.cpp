@@ -54,6 +54,25 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	pthread_mutex_unlock(&gateway->lock);
 }
 
+void Gateway::del_static_ip(int fd, short what, void *arg)
+{
+	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->lock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+	struct in_addr key = gateway->staticIPDelRequest.front();
+	gateway->staticIPDelRequest.pop();
+
+	int result = gateway->staticIPMap.erase(key.s_addr);
+	char ip_str[32];
+	inet_ntop(AF_INET, &key, ip_str, sizeof(ip_str));
+	if(result)
+		printf("Removed static IP (%s)\n", ip_str);
+	else
+		printf("Cannot find static IP (%s) for removal\n", ip_str);
+	pthread_mutex_unlock(&gateway->lock);
+}
+
 Gateway::Gateway(const char* inDev, const char* outDev)
 {
 	this->inDev = new Device(inDev);
@@ -172,5 +191,9 @@ void Gateway::addStaticIP(struct in_addr ip, struct ether_addr mac)
 
 void Gateway::delStaticIP(struct in_addr ip)
 {
-
+	pthread_mutex_lock(&this->lock);
+	this->staticIPDelRequest.push(ip);
+	eventfd_t v = 1;
+	eventfd_write(this->addStaticIPEventFD, v);
+	pthread_mutex_unlock(&this->lock);
 }

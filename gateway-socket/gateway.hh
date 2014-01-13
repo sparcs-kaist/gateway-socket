@@ -36,6 +36,7 @@ private:
 	std::unordered_map<uint32_t, struct ether_addr> staticIPMap;
 
 	static void add_static_ip(int fd, short what, void *arg);
+	static void del_static_ip(int fd, short what, void *arg);
 
 public:
 	Gateway(const char* inDev, const char* outDev);
