@@ -172,76 +172,72 @@ void Gateway::serve(void)
 					continue;
 				}
 
-				if(arp_header.ar_op == ARPOP_REQUEST)
+				
+				struct in_addr destIP = arp.getDestinationIP();
+				struct in_addr srcIP = arp.getSourceIP();
+
+				StaticIPMap::const_iterator destIter
+				= this->staticIPMap.find(destIP.s_addr);
+
+				StaticIPMap::const_iterator srcIter
+				= this->staticIPMap.find(srcIP.s_addr);
+
+				UserMap::const_iterator userIter
+				= this->userMap.find(srcIP.s_addr);
+
+				if(destIter != staticIPMap.end())
 				{
-					struct in_addr destIP = arp.getDestinationIP();
-					struct in_addr srcIP = arp.getSourceIP();
-
-					StaticIPMap::const_iterator destIter
-					= this->staticIPMap.find(destIP.s_addr);
-
-					UserMap::const_iterator srcIter
-					= this->userMap.find(srcIP.s_addr);
-
-					if(destIter != staticIPMap.end())
-					{
-						continue; //we don't have to send it outside
-					}
-
-					if(srcIter != userMap.end())
-					{
-						//change mac address
-						struct ether_addr source_mac = ethernet.getSource();
-						if(memcmp(&srcIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
-							continue; //unauthorized user is using ip
-						arp.setSourceMAC(srcIter->second->user_mac);
-						ethernet.setSource(srcIter->second->user_mac);
-					}
+					continue; //we don't have to send it outside
 				}
 
-				else if(arp_header.ar_op == ARPOP_REPLY)
+				if(userIter != userMap.end())
 				{
-					struct in_addr srcIP = arp.getSourceIP();
-
-					StaticIPMap::const_iterator static_iter
-					= this->staticIPMap.find(srcIP.s_addr);
-					UserMap::const_iterator user_iter
-					= this->userMap.find(srcIP.s_addr);
-
-					if(static_iter != staticIPMap.end())
-					{
-						if(user_iter == userMap.end())
-							continue;
-						struct ether_addr source_mac = ethernet.getSource();
-						if(memcmp(&user_iter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
-							continue; //unauthorized user is using ip
-						arp.setSourceMAC(static_iter->second);
-						ethernet.setSource(static_iter->second);
-					}
+					//change mac address
+					struct ether_addr source_mac = ethernet.getSource();
+					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+						continue; //unauthorized user is using ip
+					arp.setSourceMAC(srcIter->second);
+					ethernet.setSource(srcIter->second);
 				}
+				else if(srcIter != staticIPMap.end())
+					continue; //unauthorized user is using our ip
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
 				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
 				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
 					continue; //too short ip packet
+
+
+				struct in_addr destIP;
+				destIP.s_addr = ip_header->daddr;
 				struct in_addr srcIP;
 				srcIP.s_addr = ip_header->saddr;
 
-				StaticIPMap::const_iterator static_iter
+				StaticIPMap::const_iterator destIter
+				= this->staticIPMap.find(destIP.s_addr);
+
+				StaticIPMap::const_iterator srcIter
 				= this->staticIPMap.find(srcIP.s_addr);
-				UserMap::const_iterator user_iter
+
+				UserMap::const_iterator userIter
 				= this->userMap.find(srcIP.s_addr);
 
-				if(static_iter != staticIPMap.end())
+				if(destIter != staticIPMap.end())
 				{
-					if(user_iter == userMap.end())
-						continue; //someone is using reserved ip
-					struct ether_addr source_mac = ethernet.getSource();
-					if(memcmp(&user_iter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
-						continue; //unauthorized user is using ip
-					ethernet.setSource(static_iter->second);
+					continue; //we don't have to send it outside
 				}
+
+				if(userIter != userMap.end())
+				{
+					//change mac address
+					struct ether_addr source_mac = ethernet.getSource();
+					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+						continue; //unauthorized user is using ip
+					ethernet.setSource(srcIter->second);
+				}
+				else if(srcIter != staticIPMap.end())
+					continue; //unauthorized user is using our ip
 			}
 
 			outDev->writePacket(inPacket.inMemory, inPacket.getLength());
@@ -275,41 +271,72 @@ void Gateway::serve(void)
 					continue;
 				}
 
-				if(arp_header.ar_op == ARPOP_REPLY)
-				{
-					struct in_addr srcIP = arp.getSourceIP();
-					StaticIPMap::const_iterator static_iter
-					= this->staticIPMap.find(srcIP.s_addr);
+				struct in_addr destIP = arp.getDestinationIP();
+				struct in_addr srcIP = arp.getSourceIP();
 
-					if(static_iter != staticIPMap.end())
-					{
-						//someone is using our IP
-						continue;
-					}
+				StaticIPMap::const_iterator destIter
+				= this->staticIPMap.find(destIP.s_addr);
+
+				StaticIPMap::const_iterator srcIter
+				= this->staticIPMap.find(srcIP.s_addr);
+
+				UserMap::const_iterator userIter
+				= this->userMap.find(destIP.s_addr);
+
+				if(srcIter != staticIPMap.end())
+				{
+					continue; //we don't have to bring it inside
+					//someone is using our ip outside
 				}
+
+				if(userIter != userMap.end())
+				{
+					//change mac address
+					struct ether_addr dest_mac = ethernet.getDestination();
+					if(memcmp(&userIter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
+						continue; //unauthorized user is using ip
+					arp.setDestinationMAC(userIter->second->user_mac);
+					ethernet.setDestination(userIter->second->user_mac);
+				}
+				else if(destIter != staticIPMap.end())
+					continue; //No user is available for destination ip
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
 				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
 				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
 					continue; //too short ip packet
+
 				struct in_addr destIP;
 				destIP.s_addr = ip_header->daddr;
+				struct in_addr srcIP;
+				srcIP.s_addr = ip_header->saddr;
 
-				StaticIPMap::const_iterator static_iter
+				StaticIPMap::const_iterator destIter
 				= this->staticIPMap.find(destIP.s_addr);
-				UserMap::const_iterator user_iter
+
+				StaticIPMap::const_iterator srcIter
+				= this->staticIPMap.find(srcIP.s_addr);
+
+				UserMap::const_iterator userIter
 				= this->userMap.find(destIP.s_addr);
 
-				if(static_iter != staticIPMap.end())
+				if(srcIter != staticIPMap.end())
 				{
-					if(user_iter == userMap.end())
-						continue;
-					struct ether_addr dest_mac = ethernet.getDestination();
-					if(memcmp(&user_iter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
-						continue; //unauthorized user is using ip
-					ethernet.setDestination(user_iter->second->user_mac);
+					continue; //we don't have to bring it inside
+					//someone is using our ip outside
 				}
+
+				if(userIter != userMap.end())
+				{
+					//change mac address
+					struct ether_addr dest_mac = ethernet.getDestination();
+					if(memcmp(&userIter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
+						continue; //unauthorized user is using ip
+					ethernet.setDestination(userIter->second->user_mac);
+				}
+				else if(destIter != staticIPMap.end())
+					continue; //No user is available for destination ip
 			}
 
 			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
