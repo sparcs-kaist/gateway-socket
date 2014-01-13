@@ -17,7 +17,7 @@ class Packet
 private:
 	int writtenByte;
 	int capacity;
-	unsigned char* memory;
+	unsigned char* inMemory;
 
 
 	void setLength(int length);

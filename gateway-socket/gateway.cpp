@@ -141,7 +141,7 @@ void Gateway::serve(void)
 		int inBurst, outBurst;
 		for(inBurst = 0; inBurst < IO_BURST; inBurst++)
 		{
-			int readLen = inDev->readPacket(inPacket.memory,MTU);
+			int readLen = inDev->readPacket(inPacket.inMemory,MTU);
 			if(readLen == -1)
 				break;
 			if(readLen > MTU)
@@ -205,7 +205,7 @@ void Gateway::serve(void)
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
-				struct iphdr* ip_header = (struct iphdr*) (packet->memory + ethernet.getNextOffset());
+				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
 				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
 					continue; //too short ip packet
 				struct in_addr destIP;
@@ -227,12 +227,12 @@ void Gateway::serve(void)
 				}
 			}
 
-			outDev->writePacket(inPacket.memory, inPacket.getLength());
+			outDev->writePacket(inPacket.inMemory, inPacket.getLength());
 		}
 
 		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
 		{
-			int readLen = outDev->readPacket(outPacket.memory,MTU);
+			int readLen = outDev->readPacket(outPacket.inMemory,MTU);
 			if(readLen == -1)
 				break;
 			if(readLen > MTU)
@@ -275,7 +275,7 @@ void Gateway::serve(void)
 
 			}
 
-			inDev->writePacket(outPacket.memory, outPacket.getLength());
+			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
 		}
 
 
