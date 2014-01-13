@@ -110,10 +110,10 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 	event_add(term_event, NULL);
 
 	struct event *add_static_event = event_new(evbase, addStaticIPEventFD,
-			EV_READ | EV_PERSIST, Gateway::add_static_ip, evbase);
+			EV_READ | EV_PERSIST, Gateway::add_static_ip, this);
 	event_add(add_static_event, NULL);
 	struct event *del_static_event = event_new(evbase, delStaticIPEventFD,
-			EV_READ | EV_PERSIST, Gateway::del_static_ip, evbase);
+			EV_READ | EV_PERSIST, Gateway::del_static_ip, this);
 	event_add(del_static_event, NULL);
 }
 
