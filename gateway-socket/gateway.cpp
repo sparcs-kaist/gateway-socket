@@ -210,22 +210,22 @@ void Gateway::serve(void)
 				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
 				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
 					continue; //too short ip packet
-				struct in_addr destIP;
-				destIP.s_addr = ip_header->daddr;
+				struct in_addr srcIP;
+				srcIP.s_addr = ip_header->saddr;
 
 				StaticIPMap::const_iterator static_iter
-				= this->staticIPMap.find(destIP.s_addr);
+				= this->staticIPMap.find(srcIP.s_addr);
 				UserMap::const_iterator user_iter
-				= this->userMap.find(destIP.s_addr);
+				= this->userMap.find(srcIP.s_addr);
 
 				if(static_iter != staticIPMap.end())
 				{
 					if(user_iter == userMap.end())
-						continue;
-					struct ether_addr dest_mac = ethernet.getDestination();
-					if(memcmp(&user_iter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
+						continue; //someone is using reserved ip
+					struct ether_addr source_mac = ethernet.getSource();
+					if(memcmp(&user_iter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
 						continue; //unauthorized user is using ip
-					ethernet.setDestination(user_iter->second->user_mac);
+					ethernet.setSource(static_iter->second);
 				}
 			}
 
@@ -275,7 +275,26 @@ void Gateway::serve(void)
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
+				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
+				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
+					continue; //too short ip packet
+				struct in_addr destIP;
+				destIP.s_addr = ip_header->daddr;
 
+				StaticIPMap::const_iterator static_iter
+				= this->staticIPMap.find(destIP.s_addr);
+				UserMap::const_iterator user_iter
+				= this->userMap.find(destIP.s_addr);
+
+				if(static_iter != staticIPMap.end())
+				{
+					if(user_iter == userMap.end())
+						continue;
+					struct ether_addr dest_mac = ethernet.getDestination();
+					if(memcmp(&user_iter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
+						continue; //unauthorized user is using ip
+					ethernet.setDestination(user_iter->second->user_mac);
+				}
 			}
 
 			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
