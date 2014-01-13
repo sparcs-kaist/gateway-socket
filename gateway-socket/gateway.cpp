@@ -22,6 +22,9 @@
 #include <arpa/inet.h>
 
 using namespace std;
+using namespace boost;
+
+typedef unordered_map<uint32_t,struct ether_addr> StaticIPMap;
 
 static void terminate_gateway(int fd, short what, void *arg)
 {
@@ -150,8 +153,54 @@ void Gateway::serve(void)
 			if(readLen < (int)sizeof(header))
 				continue;
 
-			inPacket.setLength(readLen);
-			inPacket.readByteArray(0, sizeof(header), &header);
+			Packet* packet = &inPacket;
+			Ethernet ethernet(packet);
+			if(ethernet.getProtocol() == ETHERTYPE_ARP)
+			{
+				ARP arp(packet, ethernet.getNextOffset());
+				struct arphdr arp_header = arp.getHeader();
+
+				if (! (
+					(arp_header.ar_hrd == ARPHRD_ETHER) &&
+					(arp_header.ar_pro == ETHERTYPE_IP) &&
+					(arp_header.ar_op == ARPOP_InREQUEST || ARPOP_InREPLY) &&
+					(arp_header.ar_pln == sizeof(struct in_addr)) &&
+					(arp_header.ar_hln == sizeof(struct ether_addr))
+					) )
+				{
+					//filter out
+					continue;
+				}
+
+				if(arp_header.ar_op == ARPOP_REQUEST)
+				{
+					struct in_addr destIP = arp.getDestinationIP();
+					StaticIPMap::const_iterator static_iter
+					= this->staticIPMap.find(destIP.s_addr);
+
+					if(static_iter != staticIPMap.end())
+					{
+						continue;
+					}
+				}
+
+				else if(arp_header.ar_op == ARPOP_REPLY)
+				{
+					struct in_addr srcIP = arp.getSourceIP();
+					StaticIPMap::const_iterator static_iter
+					= this->staticIPMap.find(srcIP.s_addr);
+
+					if(static_iter != staticIPMap.end())
+					{
+						arp.setSourceMAC(static_iter->second);
+						ethernet.setSource(static_iter->second);
+					}
+				}
+			}
+			else if(ethernet.getProtocol() == ETHERTYPE_IP)
+			{
+
+			}
 
 
 			outDev->writePacket(inPacket.memory, inPacket.getLength());
