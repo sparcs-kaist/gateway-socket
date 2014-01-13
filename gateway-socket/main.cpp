@@ -146,8 +146,8 @@ int main(int argc, char** argv)
 
 	pthread_t main_thread;
 
-	gateway->serve();
 	pthread_create(&main_thread, 0, serve, gateway);
+
 	pthread_join(main_thread, 0);
 
 	delete gateway;
