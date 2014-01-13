@@ -8,6 +8,7 @@
 #include "arp.hh"
 #include <arpa/inet.h>
 
+
 ARP::ARP(Packet* packet)
 {
 	this->packet = packet;
@@ -21,15 +22,81 @@ ARP::ARP(Packet* packet, int offset)
 }
 
 
-void ARP::setHardware(uint16_t htype)
+void ARP::setHeader(struct arphdr header)
 {
-	uint16_t write = htons(htype);
-	packet->writeByteArray(offset, offset+2, &write);
+	header.ar_hrd = htons(header.ar_hrd);
+	header.ar_pro = htons(header.ar_pro);
+	header.ar_op = htons(header.ar_op);
+	packet->writeByteArray(offset, offset+sizeof(header), &header);
 }
 
-uint16_t ARP::getHardware()
+struct arphdr ARP::getHeader()
 {
-	uint16_t temp = 0;
-	packet->readByteArray(offset, offset+2, &temp);
-	return ntohs(temp);
+	struct arphdr header = {0,};
+	packet->readByteArray(offset, offset+sizeof(header), &header);
+
+	header.ar_hrd = ntohs(header.ar_hrd);
+	header.ar_pro = ntohs(header.ar_pro);
+	header.ar_op = ntohs(header.ar_op);
+	return header;
+}
+
+
+struct ether_addr ARP::getSourceMAC()
+{
+	struct ether_addr ret;
+	int from = offset + sizeof(struct arphdr);
+	int len = sizeof(struct ether_addr);
+	packet->readByteArray(from, from+len, &ret);
+	return ret;
+}
+
+struct ether_addr ARP::getDestinationMAC()
+{
+	struct ether_addr ret;
+	int from = offset + sizeof(struct arphdr) + sizeof(struct in_addr) + sizeof(struct ether_addr);
+	int len = sizeof(struct ether_addr);
+	packet->readByteArray(from, from+len, &ret);
+	return ret;
+}
+void ARP::setSourceMAC(struct ether_addr sourceMAC)
+{
+	int from = offset + sizeof(struct arphdr);
+	int len = sizeof(struct ether_addr);
+	packet->writeByteArray(from, from+len, &sourceMAC);
+}
+void ARP::setDestinationMAC(struct ether_addr destinationMAC)
+{
+	int from = offset + sizeof(struct arphdr) + sizeof(struct in_addr) + sizeof(struct ether_addr);
+	int len = sizeof(struct ether_addr);
+	packet->writeByteArray(from, from+len, &destinationMAC);
+}
+
+struct in_addr ARP::getSourceIP()
+{
+	struct in_addr ret;
+	int from = offset + sizeof(struct arphdr) + sizeof(struct ether_addr);
+	int len = sizeof(struct in_addr);
+	packet->readByteArray(from, from+len, &ret);
+	return ret;
+}
+struct in_addr ARP::getDestinationIP()
+{
+	struct in_addr ret;
+	int from = offset + sizeof(struct arphdr) + sizeof(struct in_addr) + sizeof(struct ether_addr) + sizeof(struct ether_addr);
+	int len = sizeof(struct in_addr);
+	packet->readByteArray(from, from+len, &ret);
+	return ret;
+}
+void ARP::setSourceIP(struct in_addr ip)
+{
+	int from = offset + sizeof(struct arphdr) + sizeof(struct ether_addr);
+	int len = sizeof(struct in_addr);
+	packet->writeByteArray(from, from+len, &ip);
+}
+void ARP::setDestinationIP(struct in_addr ip)
+{
+	int from = offset + sizeof(struct arphdr) + sizeof(struct in_addr) + sizeof(struct ether_addr) + sizeof(struct ether_addr);
+	int len = sizeof(struct in_addr);
+	packet->writeByteArray(from, from+len, &ip);
 }
