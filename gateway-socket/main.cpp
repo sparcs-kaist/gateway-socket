@@ -17,6 +17,7 @@
 #include <sys/eventfd.h>
 #include <getopt.h>
 #include <string.h>
+#include <stdio.h>
 
 using namespace std;
 

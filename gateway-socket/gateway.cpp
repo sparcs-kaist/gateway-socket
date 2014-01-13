@@ -18,7 +18,6 @@
 #include <net/if_arp.h>
 #include <memory.h>
 #include <queue>
-#include <unordered_map>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -76,6 +75,7 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 
 Gateway::Gateway(const char* inDev, const char* outDev)
 {
+
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
 
