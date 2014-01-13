@@ -151,6 +151,8 @@ void Gateway::serve(void)
 			if(readLen < (int)sizeof(header))
 				continue;
 
+			inPacket.setLength(readLen);
+
 			Packet* packet = &inPacket;
 			Ethernet ethernet(packet);
 			if(ethernet.getProtocol() == ETHERTYPE_ARP)
@@ -237,6 +239,7 @@ void Gateway::serve(void)
 				break;
 			if(readLen > MTU)
 				continue;
+			outPacket.setLength(readLen);
 
 			Packet* packet = &outPacket;
 			Ethernet ethernet(packet);
