@@ -133,6 +133,7 @@ Gateway::~Gateway()
 
 void Gateway::serve(void)
 {
+	unsigned char BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
 	Packet inPacket(MTU);
 	Packet outPacket(MTU);
 
@@ -289,17 +290,26 @@ void Gateway::serve(void)
 					//someone is using our ip outside
 				}
 
-				if(userIter != userMap.end())
+				if(destIter != staticIPMap.end())
 				{
+					if(userIter == userMap.end())
+						continue; //no such user
 					//change mac address
 					struct ether_addr dest_mac = ethernet.getDestination();
-					if(memcmp(&userIter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
-						continue; //unauthorized user is using ip
+
+					if((memcmp(&destIter->second, &dest_mac, sizeof(struct ether_addr)) != 0)
+						&&
+						(memcmp(BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
+						continue; //not broad, not my mac
 					arp.setDestinationMAC(userIter->second->user_mac);
 					ethernet.setDestination(userIter->second->user_mac);
 				}
-				else if(destIter != staticIPMap.end())
-					continue; //No user is available for destination ip
+				else if(userIter != userMap.end())
+				{
+					//we don't have static IP anymore
+					userMap.erase(userIter);
+					//TOOD free memory afterwards
+				}
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
@@ -327,16 +337,26 @@ void Gateway::serve(void)
 					//someone is using our ip outside
 				}
 
-				if(userIter != userMap.end())
+				if(destIter != staticIPMap.end())
 				{
+					if(userIter == userMap.end())
+						continue; //no such user
 					//change mac address
 					struct ether_addr dest_mac = ethernet.getDestination();
-					if(memcmp(&userIter->second->user_mac, &dest_mac, sizeof(struct ether_addr)) != 0)
-						continue; //unauthorized user is using ip
+
+					if((memcmp(&destIter->second, &dest_mac, sizeof(struct ether_addr)) != 0)
+							) //no broadcast for specific IP is allowed
+							//&&
+							//(memcmp(BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
+						continue; //not broad, not my mac
 					ethernet.setDestination(userIter->second->user_mac);
 				}
-				else if(destIter != staticIPMap.end())
-					continue; //No user is available for destination ip
+				else if(userIter != userMap.end())
+				{
+					//we don't have static IP anymore
+					userMap.erase(userIter);
+					//TOOD free memory afterwards
+				}
 			}
 
 			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
