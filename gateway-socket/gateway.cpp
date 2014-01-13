@@ -175,12 +175,27 @@ void Gateway::serve(void)
 				if(arp_header.ar_op == ARPOP_REQUEST)
 				{
 					struct in_addr destIP = arp.getDestinationIP();
-					StaticIPMap::const_iterator static_iter
+					struct in_addr srcIP = arp.getSourceIP();
+
+					StaticIPMap::const_iterator destIter
 					= this->staticIPMap.find(destIP.s_addr);
 
-					if(static_iter != staticIPMap.end())
+					UserMap::const_iterator srcIter
+					= this->userMap.find(srcIP.s_addr);
+
+					if(destIter != staticIPMap.end())
 					{
-						continue;
+						continue; //we don't have to send it outside
+					}
+
+					if(srcIter != userMap.end())
+					{
+						//change mac address
+						struct ether_addr source_mac = ethernet.getSource();
+						if(memcmp(&srcIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+							continue; //unauthorized user is using ip
+						arp.setSourceMAC(srcIter->second->user_mac);
+						ethernet.setSource(srcIter->second->user_mac);
 					}
 				}
 
