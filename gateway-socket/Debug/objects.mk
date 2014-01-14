@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -levent -lpthread
+LIBS := -levent -lmysqlcppconn -lpthread
 

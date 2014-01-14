@@ -41,14 +41,11 @@ static void terminate_gateway(int fd, short what, void *arg)
 void Gateway::add_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->lock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	pair<struct in_addr, struct ether_addr> data;
-	if(!gateway->staticIPAddRequest.pop(data))
-	{
-		printf("critical error, queue count mismatch.\n");
-		exit(1);
-	}
+	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
+	gateway->staticIPAddRequest.pop();
 
 	if(gateway->staticIPMap.size() > 0)
 		gateway->staticIPMap.erase(data.first.s_addr);
@@ -59,15 +56,17 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
 	Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
 	printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
+	pthread_mutex_unlock(&gateway->lock);
 }
 
 void Gateway::del_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->lock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	struct in_addr key;
-	gateway->staticIPDelRequest.pop(key);
+	struct in_addr key = gateway->staticIPDelRequest.front();
+	gateway->staticIPDelRequest.pop();
 
 	int result = gateway->staticIPMap.erase(key.s_addr);
 	char ip_str[32];
@@ -76,6 +75,7 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 		printf("Removed static IP (%s)\n", ip_str);
 	else
 		printf("Cannot find static IP (%s) for removal\n", ip_str);
+	pthread_mutex_unlock(&gateway->lock);
 }
 
 Gateway::Gateway(const char* inDev, const char* outDev)
