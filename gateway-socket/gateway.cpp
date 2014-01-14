@@ -41,7 +41,7 @@ static void terminate_gateway(int fd, short what, void *arg)
 void Gateway::add_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
-	pthread_mutex_lock(&gateway->lock);
+	pthread_mutex_lock(&gateway->addStaticIPLock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
 	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
@@ -56,13 +56,13 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
 	Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
 	printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
-	pthread_mutex_unlock(&gateway->lock);
+	pthread_mutex_unlock(&gateway->addStaticIPLock);
 }
 
 void Gateway::del_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
-	pthread_mutex_lock(&gateway->lock);
+	pthread_mutex_lock(&gateway->delStaticIPLock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
 	struct in_addr key = gateway->staticIPDelRequest.front();
@@ -75,7 +75,64 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 		printf("Removed static IP (%s)\n", ip_str);
 	else
 		printf("Cannot find static IP (%s) for removal\n", ip_str);
-	pthread_mutex_unlock(&gateway->lock);
+	pthread_mutex_unlock(&gateway->delStaticIPLock);
+}
+
+void Gateway::add_user(int fd, short what, void *arg)
+{
+	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->addUserLock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+
+	struct userInfo* info = gateway->userAddRequest.front();
+	gateway->userAddRequest.pop();
+
+	if(gateway->userMap.find(info->ip.s_addr) != gateway->userMap.end())
+		gateway->userMap.erase(info->ip.s_addr);
+
+	char ip_str[32];
+	char mac_str[32];
+	inet_ntop(AF_INET, &info->ip, ip_str, sizeof(ip_str));
+	Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
+	printf("Added user IP(%s), MAC(%s)\n", ip_str, mac_str);
+
+	gateway->userMap.insert(pair<uint32_t, struct userInfo*>(info->ip.s_addr, info));
+
+	pthread_mutex_unlock(&gateway->addUserLock);
+}
+void Gateway::del_user(int fd, short what, void *arg)
+{
+	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->delUserLock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+
+	struct in_addr ip = gateway->userDelRequest.front();
+	gateway->userDelRequest.pop();
+
+	boost::unordered_map<uint32_t, struct userInfo*>::iterator iter = gateway->userMap.find(ip.s_addr);
+	if(iter != gateway->userMap.end())
+	{
+		struct userInfo* info = iter->second;
+		char ip_str[32];
+		char mac_str[32];
+		inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str));
+		if(!info)
+		{
+			printf("Cannot find user info (%s) for removal\n", ip_str);
+		}
+		else
+		{
+			Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
+			printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
+			free(info);
+		}
+		if(gateway->userMap.size() > 0)
+			gateway->userMap.erase(ip.s_addr);
+	}
+
+	pthread_mutex_unlock(&gateway->delUserLock);
 }
 
 Gateway::Gateway(const char* inDev, const char* outDev)
@@ -84,7 +141,10 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
 
-	pthread_mutex_init(&this->lock, NULL);
+	pthread_mutex_init(&this->addStaticIPLock, NULL);
+	pthread_mutex_init(&this->delStaticIPLock, NULL);
+	pthread_mutex_init(&this->addUserLock, NULL);
+	pthread_mutex_init(&this->delUserLock, NULL);
 
 	termEventFD = eventfd(0,0);
 	if(termEventFD < 0)
@@ -104,6 +164,19 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 		printf("cannot create del event\n");
 		exit(1);
 	}
+	addUserEventFD = eventfd(0,0);
+	if(addUserEventFD < 0)
+	{
+		printf("cannot create add user event\n");
+		exit(1);
+	}
+
+	delUserEventFD = eventfd(0,0);
+	if(delUserEventFD < 0)
+	{
+		printf("cannot create del user event\n");
+		exit(1);
+	}
 
 
 	evbase = event_base_new();
@@ -120,16 +193,29 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 	struct event *del_static_event = event_new(evbase, delStaticIPEventFD,
 			EV_READ | EV_PERSIST, Gateway::del_static_ip, this);
 	event_add(del_static_event, NULL);
+
+	struct event *add_user_event = event_new(evbase, addUserEventFD,
+			EV_READ | EV_PERSIST, Gateway::add_user, this);
+	event_add(add_user_event, NULL);
+
+	struct event *del_user_event = event_new(evbase, delUserEventFD,
+			EV_READ | EV_PERSIST, Gateway::del_user, this);
+	event_add(del_user_event, NULL);
 }
 
 Gateway::~Gateway()
 {
-	pthread_mutex_destroy(&this->lock);
+	pthread_mutex_destroy(&this->addStaticIPLock);
+	pthread_mutex_destroy(&this->delStaticIPLock);
+	pthread_mutex_destroy(&this->addUserLock);
+	pthread_mutex_destroy(&this->delUserLock);
 	delete inDev;
 	delete outDev;
 	close(termEventFD);
 	close(addStaticIPEventFD);
 	close(delStaticIPEventFD);
+	close(addUserEventFD);
+	close(delUserEventFD);
 }
 
 void Gateway::serve(void)
@@ -384,18 +470,37 @@ void Gateway::terminate()
 
 void Gateway::addStaticIP(struct in_addr ip, struct ether_addr mac)
 {
-	pthread_mutex_lock(&this->lock);
+	pthread_mutex_lock(&this->addStaticIPLock);
 	this->staticIPAddRequest.push(pair<struct in_addr, struct ether_addr>(ip, mac));
 	eventfd_t v = 1;
 	eventfd_write(this->addStaticIPEventFD, v);
-	pthread_mutex_unlock(&this->lock);
+	pthread_mutex_unlock(&this->addStaticIPLock);
 }
 
 void Gateway::delStaticIP(struct in_addr ip)
 {
-	pthread_mutex_lock(&this->lock);
+	pthread_mutex_lock(&this->delStaticIPLock);
 	this->staticIPDelRequest.push(ip);
 	eventfd_t v = 1;
-	eventfd_write(this->addStaticIPEventFD, v);
-	pthread_mutex_unlock(&this->lock);
+	eventfd_write(this->delStaticIPEventFD, v);
+	pthread_mutex_unlock(&this->delStaticIPLock);
+}
+
+void Gateway::addUserInfo(struct userInfo info)
+{
+	pthread_mutex_lock(&this->addUserLock);
+	struct userInfo* copy = (struct userInfo*)malloc(sizeof(struct userInfo));
+	memcpy(copy, &info, sizeof(struct userInfo));
+	this->userAddRequest.push(copy);
+	eventfd_t v = 1;
+	eventfd_write(this->addUserEventFD, v);
+	pthread_mutex_unlock(&this->addUserLock);
+}
+void Gateway::delUserInfo(struct in_addr ip)
+{
+	pthread_mutex_lock(&this->delUserLock);
+	this->userDelRequest.push(ip);
+	eventfd_t v = 1;
+	eventfd_write(this->delUserEventFD, v);
+	pthread_mutex_unlock(&this->delUserLock);
 }
