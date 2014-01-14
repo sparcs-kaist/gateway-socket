@@ -100,8 +100,13 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	UDP *udphdr = new UDP(packet, offset);
 	udphdr->setSource(p_src);
 	udphdr->setDestination(p_dst);
+
+	unsigned int udp_len = sizeof(struct udphdr) + data_len;
+	udp_len = htons(udp_len);
+	packet->writeByteArray(offset+4, offset+6, &udp_len);
 	packet->writeByte(offset+6, 0);
 	packet->writeByte(offset+7, 0);
+
 	offset = udphdr->getNextOffset();
 
 	packet->writeByteArray(udphdr->getNextOffset()+0, udphdr->getNextOffset()+data_len, data);
@@ -109,7 +114,7 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	uint16_t temp = 0;
 	sum = 0;
 	pointer = (const uint16_t *) (&pheader);
-	while((void *) pointer < (void *) (&thdr+1))
+	while((void *) pointer < (void *) (&pheader+1))
 	{
 		sum += ntohs(*pointer);
 		pointer++;
@@ -118,7 +123,10 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	while(current < len)
 	{
 		if ((current+1) == len)
+		{
 			temp = packet->readByte(current);
+			temp = temp << 8;
+		}
 		else
 			packet->readByteArray(current, current+2, &temp);
 
