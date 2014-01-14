@@ -12,14 +12,14 @@ uint16_t UDP::getSource()
 {
 	uint16_t ret;
 	packet->readByteArray(offset+0, offset+2, &ret);
-	return ret;
+	return ntohs(ret);
 }
 
 uint16_t UDP::getDestination()
 {
 	uint16_t ret;
 	packet->readByteArray(offset+2, offset+4, &ret);
-	return ret;
+	return ntohs(ret);
 }
 
 void UDP::setSource(uint16_t src)
