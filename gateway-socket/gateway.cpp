@@ -8,6 +8,8 @@
 #include "gateway.hh"
 #include "packet.hh"
 #include "ethernet.hh"
+#include "arp.hh"
+#include "ip.hh"
 
 #include <sys/eventfd.h>
 #include <event.h>
@@ -18,7 +20,6 @@
 #include <net/if_arp.h>
 #include <memory.h>
 #include <queue>
-#include <netinet/in.h>
 #include <arpa/inet.h>
 
 using namespace std;
@@ -133,7 +134,8 @@ Gateway::~Gateway()
 
 void Gateway::serve(void)
 {
-	unsigned char BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
+	unsigned char ETHER_BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
+	struct in_addr IPv4_BROADCAST = { 0xFFFFFFFF };
 	Packet inPacket(MTU);
 	Packet outPacket(MTU);
 
@@ -205,15 +207,12 @@ void Gateway::serve(void)
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
-				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
-				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
+				IP ip(packet, ethernet.getNextOffset());
+				if(readLen < (ethernet.getNextOffset() + ip.getNextOffset()))
 					continue; //too short ip packet
 
-
-				struct in_addr destIP;
-				destIP.s_addr = ip_header->daddr;
-				struct in_addr srcIP;
-				srcIP.s_addr = ip_header->saddr;
+				struct in_addr destIP = ip.getDestination();
+				struct in_addr srcIP = ip.getSource();
 
 				StaticIPMap::const_iterator destIter
 				= this->staticIPMap.find(destIP.s_addr);
@@ -239,6 +238,17 @@ void Gateway::serve(void)
 				}
 				else if(srcIter != staticIPMap.end())
 					continue; //unauthorized user is using our ip
+
+				//if(ip.getProtocol() == IPPROTO_UDP)
+				{
+					char buf1[32];
+					char buf2[32];
+					struct in_addr temp = ip.getSource();
+					inet_ntop(AF_INET, &temp, buf1, sizeof(buf1));
+					temp = ip.getDestination();
+					inet_ntop(AF_INET, &temp, buf2, sizeof(buf2));
+					printf("IP (%s->%s) packet received. proto %d, len %d.\n", buf1, buf2, ip.getProtocol(), ip.getNextOffset());
+				}
 			}
 
 			outDev->writePacket(inPacket.inMemory, inPacket.getLength());
@@ -299,7 +309,7 @@ void Gateway::serve(void)
 
 					if((memcmp(&destIter->second, &dest_mac, sizeof(struct ether_addr)) != 0)
 						&&
-						(memcmp(BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
+						(memcmp(ETHER_BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
 						continue; //not broad, not my mac
 					arp.setDestinationMAC(userIter->second->user_mac);
 					ethernet.setDestination(userIter->second->user_mac);
@@ -313,14 +323,12 @@ void Gateway::serve(void)
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
-				struct iphdr* ip_header = (struct iphdr*) (packet->inMemory + ethernet.getNextOffset());
-				if((unsigned)readLen < (ethernet.getNextOffset() + sizeof(struct iphdr)))
+				IP ip(packet, ethernet.getNextOffset());
+				if(readLen < (ethernet.getNextOffset() + ip.getNextOffset()))
 					continue; //too short ip packet
 
-				struct in_addr destIP;
-				destIP.s_addr = ip_header->daddr;
-				struct in_addr srcIP;
-				srcIP.s_addr = ip_header->saddr;
+				struct in_addr destIP = ip.getDestination();
+				struct in_addr srcIP = ip.getSource();
 
 				StaticIPMap::const_iterator destIter
 				= this->staticIPMap.find(destIP.s_addr);

@@ -57,19 +57,27 @@ bool Packet::readBit(int index)
 
 void Packet::readByteArray(int from, int to, void* buffer)
 {
+	if(from < 0 || to > this->writtenByte)
+		return;
 	memcpy(buffer, inMemory+from, to-from);
 }
 void Packet::writeByteArray(int from, int to, const void* buffer)
 {
+	if(from < 0 || to > this->writtenByte)
+		return;
 	memcpy(inMemory+from, buffer, to-from);
 }
 
 int Packet::readByte(int index)
 {
+	if(index < 0 || index >= this->writtenByte)
+		return -1;
 	return inMemory[index];
 }
 void Packet::writeByte(int index, uint8_t data)
 {
+	if(index < 0 || index >= this->writtenByte)
+		return;
 	inMemory[index] = data;
 }
 
