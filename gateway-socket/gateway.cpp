@@ -245,7 +245,6 @@ void Gateway::serve(void)
 					if( (memcmp(&IPv4_NONE, &srcIP, sizeof(struct in_addr)) == 0)
 							&& (memcmp(&IPv4_BROADCAST, &destIP, sizeof(struct in_addr)) == 0) )
 					{
-
 					}
 				}
 			}

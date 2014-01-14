@@ -71,6 +71,7 @@ static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether
 	/* END OF ETHERNET */
 
 	/* START OF IP */
+	IP *iphdr = new IP(packet, offset);
 	struct ip thdr;
 	thdr.ip_hl = 5;
 	thdr.ip_v = 4;
@@ -88,29 +89,43 @@ static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether
 	uint32_t sum = 0;
 	while((void *) pointer < (void *) (&thdr+1))
 	{
-		sum = ntohs(*pointer);
+		sum += ntohs(*pointer);
 		pointer++;
 	}
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
-	thdr.ip_sum = (uint16_t) sum;
+	thdr.ip_sum = htons((uint16_t) sum);
 
 	packet->writeByteArray(offset+0, offset+sizeof(struct ip), &thdr);
 	offset = offset+sizeof(struct ip);
 	/* END OF IP */
 
 	/* START OF UDP & DATA */
+	struct pseudoheader pheader;
+	pheader->src = iphdr->getSource();
+	pheader->dst = iphdr->getDestination();
+	pheader->zero = 0;
+	pheader->proto = IPPROTO_UDP;
+	pheader->tot = htons(packet->getLength()-offset);
+
 	UDP *udphdr = new UDP(packet, offset);
 	udphdr->setSource(p_src);
 	udphdr->setDestination(p_dst);
 	packet->writeByte(offset+6, 0);
 	packet->writeByte(offset+7, 0);
 	offset = udphdr->getNextOffset();
+
 	packet->writeByteArray(udphdr->getNextOffset()+0, udphdr->getNextOffset()+data_len, data);
 
 	uint16_t temp = 0;
 	sum = 0;
-	current  offset;
+	pointer = (const uint16_t *) (&pheader);
+	while((void *) pointer < (void *) (&thdr+1))
+	{
+		sum += ntohs(*pointer);
+		pointer++;
+	}
+	int current = offset;
 	while(current < packet->getLength())
 	{
 		if ((current+1) == packet->getLength())
@@ -123,7 +138,7 @@ static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether
 	}
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
-
-	packet->writeByteArray(offset+6, offset+8, &sum);
+	temp = htons((uint16_t) sum);
+	packet->writeByteArray(offset+6, offset+8, &temp);
 	/* END OF UDP & DATA*/
 }

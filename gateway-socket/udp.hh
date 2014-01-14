@@ -13,6 +13,8 @@
 
 struct pseudoheader
 {
+	struct in_addr src;
+	struct in_addr dst;
 	uint8_t zero;
 	uint8_t proto;
 	uint16_t tot_len;
