@@ -51,5 +51,5 @@ int IP::getNextOffset()
 	hlen &= 0x0F;
 	if(hlen < 5)
 		hlen = 5;
-	return hlen * 4;
+	return offset + hlen * 4;
 }
