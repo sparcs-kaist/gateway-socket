@@ -35,10 +35,10 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 
 		conn->setSchema(dbName);
 
-		selectMACwithIP = conn->prepareStatement("SELECT `mac` FROM 'static_ip' WHERE `ip` = ?");
-		selectAllIP = conn->prepareStatement("SELECT * FROM 'static_ip'");
-		selectUserIPfromMAC = conn->prepareStatement("SELECT `ip` FROM 'user' WHERE `mac` = ?");
-		updateAccessTime = conn->prepareStatement("UPDATE 'user' SET `accessed` = NOW() WHERE `mac` = ?");
+		selectMACwithIP = conn->prepareStatement("SELECT `mac` FROM `static_ip` WHERE `ip` = ?");
+		selectAllIP = conn->prepareStatement("SELECT * FROM `static_ip`");
+		selectUserIPfromMAC = conn->prepareStatement("SELECT `ip` FROM `user` WHERE `mac` = ?");
+		updateAccessTime = conn->prepareStatement("UPDATE `user` SET `accessed` = NOW() WHERE `mac` = ?");
 	}
 	catch(sql::SQLException &e)
 	{

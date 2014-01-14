@@ -44,18 +44,21 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	pthread_mutex_lock(&gateway->addStaticIPLock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
-	gateway->staticIPAddRequest.pop();
+	for(eventfd_t count = 0; count < v; count++)
+	{
+		pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
+		gateway->staticIPAddRequest.pop();
 
-	if(gateway->staticIPMap.size() > 0)
-		gateway->staticIPMap.erase(data.first.s_addr);
-	gateway->staticIPMap.insert(pair<uint32_t, struct ether_addr>(data.first.s_addr, data.second));
+		if(gateway->staticIPMap.size() > 0)
+			gateway->staticIPMap.erase(data.first.s_addr);
+		gateway->staticIPMap.insert(pair<uint32_t, struct ether_addr>(data.first.s_addr, data.second));
 
-	char ip_str[32];
-	char mac_str[32];
-	inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
-	Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
-	printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
+		char ip_str[32];
+		char mac_str[32];
+		inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
+		Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
+		printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
+	}
 	pthread_mutex_unlock(&gateway->addStaticIPLock);
 }
 
@@ -65,16 +68,19 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 	pthread_mutex_lock(&gateway->delStaticIPLock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	struct in_addr key = gateway->staticIPDelRequest.front();
-	gateway->staticIPDelRequest.pop();
+	for(eventfd_t count = 0; count < v; count++)
+	{
+		struct in_addr key = gateway->staticIPDelRequest.front();
+		gateway->staticIPDelRequest.pop();
 
-	int result = gateway->staticIPMap.erase(key.s_addr);
-	char ip_str[32];
-	inet_ntop(AF_INET, &key, ip_str, sizeof(ip_str));
-	if(result)
-		printf("Removed static IP (%s)\n", ip_str);
-	else
-		printf("Cannot find static IP (%s) for removal\n", ip_str);
+		int result = gateway->staticIPMap.erase(key.s_addr);
+		char ip_str[32];
+		inet_ntop(AF_INET, &key, ip_str, sizeof(ip_str));
+		if(result)
+			printf("Removed static IP (%s)\n", ip_str);
+		else
+			printf("Cannot find static IP (%s) for removal\n", ip_str);
+	}
 	pthread_mutex_unlock(&gateway->delStaticIPLock);
 }
 
@@ -85,19 +91,23 @@ void Gateway::add_user(int fd, short what, void *arg)
 	eventfd_t v;
 	eventfd_read(fd, &v);
 
-	struct userInfo* info = gateway->userAddRequest.front();
-	gateway->userAddRequest.pop();
+	for(eventfd_t count = 0; count < v; count++)
+	{
+		struct userInfo* info = gateway->userAddRequest.front();
+		gateway->userAddRequest.pop();
 
-	if(gateway->userMap.find(info->ip.s_addr) != gateway->userMap.end())
-		gateway->userMap.erase(info->ip.s_addr);
+		if(gateway->userMap.find(info->ip.s_addr) != gateway->userMap.end())
+			gateway->userMap.erase(info->ip.s_addr);
 
-	char ip_str[32];
-	char mac_str[32];
-	inet_ntop(AF_INET, &info->ip, ip_str, sizeof(ip_str));
-	Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
-	printf("Added user IP(%s), MAC(%s)\n", ip_str, mac_str);
+		char ip_str[32];
+		char mac_str[32];
+		inet_ntop(AF_INET, &info->ip, ip_str, sizeof(ip_str));
+		Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
+		printf("Added user IP(%s), MAC(%s)\n", ip_str, mac_str);
 
-	gateway->userMap.insert(pair<uint32_t, struct userInfo*>(info->ip.s_addr, info));
+		gateway->userMap.insert(pair<uint32_t, struct userInfo*>(info->ip.s_addr, info));
+
+	}
 
 	pthread_mutex_unlock(&gateway->addUserLock);
 }
@@ -108,28 +118,31 @@ void Gateway::del_user(int fd, short what, void *arg)
 	eventfd_t v;
 	eventfd_read(fd, &v);
 
-	struct in_addr ip = gateway->userDelRequest.front();
-	gateway->userDelRequest.pop();
-
-	boost::unordered_map<uint32_t, struct userInfo*>::iterator iter = gateway->userMap.find(ip.s_addr);
-	if(iter != gateway->userMap.end())
+	for(eventfd_t count = 0; count < v; count++)
 	{
-		struct userInfo* info = iter->second;
-		char ip_str[32];
-		char mac_str[32];
-		inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str));
-		if(!info)
+		struct in_addr ip = gateway->userDelRequest.front();
+		gateway->userDelRequest.pop();
+
+		boost::unordered_map<uint32_t, struct userInfo*>::iterator iter = gateway->userMap.find(ip.s_addr);
+		if(iter != gateway->userMap.end())
 		{
-			printf("Cannot find user info (%s) for removal\n", ip_str);
+			struct userInfo* info = iter->second;
+			char ip_str[32];
+			char mac_str[32];
+			inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str));
+			if(!info)
+			{
+				printf("Cannot find user info (%s) for removal\n", ip_str);
+			}
+			else
+			{
+				Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
+				printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
+				free(info);
+			}
+			if(gateway->userMap.size() > 0)
+				gateway->userMap.erase(ip.s_addr);
 		}
-		else
-		{
-			Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
-			printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
-			free(info);
-		}
-		if(gateway->userMap.size() > 0)
-			gateway->userMap.erase(ip.s_addr);
 	}
 
 	pthread_mutex_unlock(&gateway->delUserLock);
