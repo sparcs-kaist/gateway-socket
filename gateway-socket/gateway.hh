@@ -12,8 +12,8 @@
 #include "arp.hh"
 #include <sys/time.h>
 #include <pthread.h>
-#include <queue>
 #include <boost/unordered_map.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 #define MTU (ETH_FRAME_LEN*2)
 #define IO_BURST 16
@@ -38,8 +38,8 @@ private:
 
 
 	pthread_mutex_t lock;
-	std::queue< std::pair<struct in_addr, struct ether_addr> > staticIPAddRequest;
-	std::queue<struct in_addr> staticIPDelRequest;
+	boost::lockfree::spsc_queue< std::pair<struct in_addr, struct ether_addr> > staticIPAddRequest;
+	boost::lockfree::spsc_queue<struct in_addr> staticIPDelRequest;
 	boost::unordered_map<uint32_t, struct ether_addr> staticIPMap;
 
 	boost::unordered_map<uint32_t, struct userInfo*> userMap;

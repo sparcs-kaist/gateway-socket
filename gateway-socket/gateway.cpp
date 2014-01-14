@@ -41,11 +41,14 @@ static void terminate_gateway(int fd, short what, void *arg)
 void Gateway::add_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
-	pthread_mutex_lock(&gateway->lock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	pair<struct in_addr, struct ether_addr> data = gateway->staticIPAddRequest.front();
-	gateway->staticIPAddRequest.pop();
+	pair<struct in_addr, struct ether_addr> data;
+	if(!gateway->staticIPAddRequest.pop(data))
+	{
+		printf("critical error, queue count mismatch.\n");
+		exit(1);
+	}
 
 	if(gateway->staticIPMap.size() > 0)
 		gateway->staticIPMap.erase(data.first.s_addr);
@@ -56,17 +59,15 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 	inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
 	Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
 	printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
-	pthread_mutex_unlock(&gateway->lock);
 }
 
 void Gateway::del_static_ip(int fd, short what, void *arg)
 {
 	Gateway* gateway = (Gateway*)arg;
-	pthread_mutex_lock(&gateway->lock);
 	eventfd_t v;
 	eventfd_read(fd, &v);
-	struct in_addr key = gateway->staticIPDelRequest.front();
-	gateway->staticIPDelRequest.pop();
+	struct in_addr key;
+	gateway->staticIPDelRequest.pop(key);
 
 	int result = gateway->staticIPMap.erase(key.s_addr);
 	char ip_str[32];
@@ -75,7 +76,6 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 		printf("Removed static IP (%s)\n", ip_str);
 	else
 		printf("Cannot find static IP (%s) for removal\n", ip_str);
-	pthread_mutex_unlock(&gateway->lock);
 }
 
 Gateway::Gateway(const char* inDev, const char* outDev)
@@ -134,8 +134,9 @@ Gateway::~Gateway()
 
 void Gateway::serve(void)
 {
-	unsigned char ETHER_BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
-	struct in_addr IPv4_BROADCAST = { 0xFFFFFFFF };
+	const unsigned char ETHER_BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
+	const struct in_addr IPv4_BROADCAST = { 0xFFFFFFFF };
+	const struct in_addr IPv4_NONE = { 0x00000000 };
 	Packet inPacket(MTU);
 	Packet outPacket(MTU);
 
@@ -239,15 +240,13 @@ void Gateway::serve(void)
 				else if(srcIter != staticIPMap.end())
 					continue; //unauthorized user is using our ip
 
-				//if(ip.getProtocol() == IPPROTO_UDP)
+				if(ip.getProtocol() == IPPROTO_UDP)
 				{
-					char buf1[32];
-					char buf2[32];
-					struct in_addr temp = ip.getSource();
-					inet_ntop(AF_INET, &temp, buf1, sizeof(buf1));
-					temp = ip.getDestination();
-					inet_ntop(AF_INET, &temp, buf2, sizeof(buf2));
-					printf("IP (%s->%s) packet received. proto %d, len %d.\n", buf1, buf2, ip.getProtocol(), ip.getNextOffset());
+					if( (memcmp(&IPv4_NONE, &srcIP, sizeof(struct in_addr)) == 0)
+							&& (memcmp(&IPv4_BROADCAST, &destIP, sizeof(struct in_addr)) == 0) )
+					{
+
+					}
 				}
 			}
 
