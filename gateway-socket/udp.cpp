@@ -31,7 +31,7 @@ void UDP::setSource(uint16_t src)
 void UDP::setDestination(uint16_t dest)
 {
 	uint16_t tmp;
-	tmp = htons(src);
+	tmp = htons(dest);
 	packet->writeByteArray(offset+2, offset+4, &tmp);
 }
 
@@ -40,13 +40,6 @@ void UDP::setLength(uint16_t len)
 	uint16_t tmp;
 	tmp = htons(len);
 	packet->writeByteArray(offset+4, offset+6, &tmp);
-}
-
-void UDP::setChecksum(uint16_t cksum)
-{
-	uint16_t tmp;
-	tmp = htons(cksum);
-	packet->writeByteArray(offset+6, offset+8, &tmp);
 }
 
 int UDP::getNextOffset()
