@@ -10,6 +10,8 @@
 #include "ethernet.hh"
 #include "arp.hh"
 #include "ip.hh"
+#include "udp.hh"
+#include "dhcp.hh"
 
 #include <sys/eventfd.h>
 #include <event.h>
@@ -344,6 +346,15 @@ void Gateway::serve(void)
 					if( (memcmp(&IPv4_NONE, &srcIP, sizeof(struct in_addr)) == 0)
 							&& (memcmp(&IPv4_BROADCAST, &destIP, sizeof(struct in_addr)) == 0) )
 					{
+						UDP udp(packet, ip.getNextOffset());
+						if((udp.getSource() == 68) && (udp.getDestination() == 67))
+						{
+							DHCP dhcp(packet, udp.getNextOffset());
+							char mac_buf[32];
+							Ethernet::printMAC(dhcp.getClientMAC(), mac_buf, sizeof(mac_buf));
+							printf("DHCP received: OP(%d), MAC(%s), ID(%X)\n", dhcp.getOpcode(), mac_buf, dhcp.getTransactionID());
+							continue;
+						}
 					}
 				}
 			}
