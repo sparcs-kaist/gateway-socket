@@ -5,6 +5,8 @@
 # Add inputs and outputs from these tool invocations to the build variables 
 CPP_SRCS += \
 ../arp.cpp \
+../database.cpp \
+../dhcp.cpp \
 ../ethernet.cpp \
 ../gateway.cpp \
 ../ip.cpp \
@@ -14,6 +16,8 @@ CPP_SRCS += \
 
 OBJS += \
 ./arp.o \
+./database.o \
+./dhcp.o \
 ./ethernet.o \
 ./gateway.o \
 ./ip.o \
@@ -23,6 +27,8 @@ OBJS += \
 
 CPP_DEPS += \
 ./arp.d \
+./database.d \
+./dhcp.d \
 ./ethernet.d \
 ./gateway.d \
 ./ip.d \
