@@ -57,7 +57,6 @@ int main(int argc, char** argv)
 	int neccessary = 4;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
-	static_ip_filename[0] = 0;
 	signal(SIGINT, exit_handle);
 	char db_user[255];
 	char db_pass[255];
