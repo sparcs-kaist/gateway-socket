@@ -9,6 +9,7 @@
 #include "packet.hh"
 #include "gateway.hh"
 #include "ethernet.hh"
+#include "database.hh"
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <iostream>
@@ -53,12 +54,15 @@ static void help(const char* name)
 
 int main(int argc, char** argv)
 {
-	int neccessary = 2;
+	int neccessary = 4;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
-	char static_ip_filename[256];
 	static_ip_filename[0] = 0;
 	signal(SIGINT, exit_handle);
+	char db_user[255];
+	char db_pass[255];
+	char db_name[255];
+	strncpy(db_name, "gateway", sizeof(db_name));
 
 	static int long_opt;
 	int option_index;
@@ -66,7 +70,9 @@ int main(int argc, char** argv)
 	{
 			{"inside", required_argument,        0, 'i'},
 			{"outside", required_argument,       0, 'o'},
-			{"static-ip",   required_argument,       0, 's'},
+			{"db-user",   required_argument,       0, 'u'},
+			{"db-pass",   required_argument,       0, 'p'},
+			{"db-name",   required_argument,       0, 'n'},
 			{0, 0, 0, 0}
 	};
 
@@ -74,7 +80,7 @@ int main(int argc, char** argv)
 	while (1)
 	{
 		long_opt = 0;
-		int c = getopt_long (argc, argv, "s:i:o:",
+		int c = getopt_long (argc, argv, "u:p:i:o:n:",
 				long_options, &option_index);
 
 		/* Detect the end of the options. */
@@ -106,9 +112,21 @@ int main(int argc, char** argv)
 				strncpy(out_dev, optarg, sizeof(in_dev));
 				break;
 			}
-			case 's':
+			case 'u':
 			{
-				strncpy(static_ip_filename, optarg, sizeof(static_ip_filename));
+				neccessary--;
+				strncpy(db_user, optarg, sizeof(db_user));
+				break;
+			}
+			case 'p':
+			{
+				neccessary--;
+				strncpy(db_pass, optarg, sizeof(db_pass));
+				break;
+			}
+			case 'n':
+			{
+				strncpy(db_name, optarg, sizeof(db_name));
 				break;
 			}
 			default:
@@ -123,25 +141,17 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 
+	Database db("localhost", db_user, db_pass, db_name);
+
 	gateway = new Gateway(in_dev, out_dev);
 
-	if(strlen(static_ip_filename))
+	vector< pair<struct in_addr, struct ether_addr> > allIP = db.getAllStaticIP();
+	for(vector< pair<struct in_addr, struct ether_addr> >::iterator iter = allIP.begin(); iter != allIP.end(); iter++)
 	{
-		char ip_str[32];
-		char mac_str[32];
-		FILE* ip_file = fopen(static_ip_filename, "r");
-		while(2 == fscanf(ip_file, "%30s %30s", ip_str, mac_str))
-		{
-			struct in_addr in_addr;
-			if(!inet_aton(ip_str, &in_addr))
-			{
-				printf("Bad ip adress %s\n", ip_str);
-				continue;
-			}
-			struct ether_addr mac_addr = Ethernet::readMAC(mac_str);
-			gateway->addStaticIP(in_addr, mac_addr);
-		}
-		fclose(ip_file);
+		struct in_addr in_addr = iter->first;
+		struct ether_addr mac_addr = iter->second;
+
+		gateway->addStaticIP(in_addr, mac_addr);
 	}
 
 	pthread_t main_thread;

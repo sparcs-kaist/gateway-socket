@@ -10,6 +10,8 @@
 
 #include <cppconn/driver.h>
 #include <cppconn/statement.h>
+#include <vector>
+#include <netinet/ether.h>
 
 class Database
 {
@@ -26,6 +28,7 @@ public:
 	Database(const char* host, const char* userName, const char* passwd, const char* dbName);
 	~Database();
 
+	std::vector< std::pair<struct in_addr, struct ether_addr> > getAllStaticIP();
 };
 
 
