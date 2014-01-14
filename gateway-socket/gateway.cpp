@@ -356,7 +356,7 @@ void Gateway::serve(void)
 
 							//XXX udp test code
 							Packet forSend(MTU);
-							forSend.setLength() = MTU;
+							forSend.setLength(MTU);
 							struct ether_addr temp_mac = Ethernet::readMAC("AA:BB:CC:DD:EE:FF");
 
 							const char* str = "HELLO UDP";
