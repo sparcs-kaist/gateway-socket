@@ -83,7 +83,7 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	}
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
-	thdr.ip_sum = htons((uint16_t) sum);
+	thdr.ip_sum = htons(~((uint16_t) sum));
 
 	packet->writeByteArray(offset+0, offset+sizeof(struct ip), &thdr);
 	offset = offset+sizeof(struct ip);
@@ -135,7 +135,7 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	}
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
-	temp = htons((uint16_t) sum);
+	temp = htons(~((uint16_t) sum));
 	packet->writeByteArray(offset+6, offset+8, &temp);
 	/* END OF UDP & DATA*/
 
