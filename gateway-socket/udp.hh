@@ -38,9 +38,9 @@ public:
 
 	int getNextOffset();
 
-	static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst, 
+	static int makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst,
 	                       struct in_addr ip_src, struct in_addr ip_dst, uint16_t p_src, 
-	                       uint16_t p_dst, void *data, size_t data_len);
+	                       uint16_t p_dst, const void *data, size_t data_len);
 };
 
 #endif /* UDP_HH_ */

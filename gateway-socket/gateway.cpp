@@ -353,6 +353,23 @@ void Gateway::serve(void)
 							char mac_buf[32];
 							Ethernet::printMAC(dhcp.getClientMAC(), mac_buf, sizeof(mac_buf));
 							printf("DHCP received: OP(%d), MAC(%s), ID(%X)\n", dhcp.getOpcode(), mac_buf, dhcp.getTransactionID());
+
+							//XXX udp test code
+							Packet forSend(MTU);
+							forSend.setLength() = MTU;
+							struct ether_addr temp_mac = Ethernet::readMAC("AA:BB:CC:DD:EE:FF");
+
+							const char* str = "HELLO UDP";
+							struct in_addr src_ip;
+							src_ip.s_addr = inet_addr("192.168.0.1");
+							struct in_addr dst_ip;
+							dst_ip.s_addr = inet_addr("255.255.255.255");
+							int len = UDP::makePacket(&forSend, temp_mac, dhcp.getClientMAC(), src_ip, dst_ip, 1234, 5678, str, 9);
+							if(len > 0)
+							{
+								forSend.setLength(len);
+								inDev->writePacket(forSend.inMemory, forSend.getLength());
+							}
 							continue;
 						}
 					}

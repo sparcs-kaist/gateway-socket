@@ -90,3 +90,8 @@ int Packet::getLength()
 {
 	return writtenByte;
 }
+
+int Packet::getCapacity()
+{
+	return capacity;
+}

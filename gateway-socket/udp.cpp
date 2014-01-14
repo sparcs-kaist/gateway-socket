@@ -41,12 +41,14 @@ int UDP::getNextOffset()
 	return this->offset+sizeof(struct udphdr);
 }
 
-void UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst,
+int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst,
 	                       struct in_addr ip_src, struct in_addr ip_dst, uint16_t p_src,
-	                       uint16_t p_dst, void *data, size_t data_len)
+	                       uint16_t p_dst, const void *data, size_t data_len)
 {
-	packet = new Packet(sizeof(struct ether_header)+
-	                    sizeof(struct ip)+sizeof(struct pseudoheader)+sizeof(struct udphdr)+data_len);
+	int len = sizeof(struct ether_header)+
+            sizeof(struct ip)+sizeof(struct pseudoheader)+sizeof(struct udphdr)+data_len;
+	if(len > packet->getCapacity())
+		return -1;
 	int offset = 0;
 
 	/* START OF ETHERNET */
@@ -93,7 +95,7 @@ void UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_a
 	pheader.dst = iphdr->getDestination();
 	pheader.zero = 0;
 	pheader.proto = IPPROTO_UDP;
-	pheader.tot_len = htons(packet->getLength()-offset);
+	pheader.tot_len = htons(len-offset);
 
 	UDP *udphdr = new UDP(packet, offset);
 	udphdr->setSource(p_src);
@@ -113,9 +115,9 @@ void UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_a
 		pointer++;
 	}
 	int current = offset;
-	while(current < packet->getLength())
+	while(current < len)
 	{
-		if ((current+1) == packet->getLength())
+		if ((current+1) == len)
 			temp = packet->readByte(current);
 		else
 			packet->readByteArray(current, current+2, &temp);
@@ -128,4 +130,6 @@ void UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_a
 	temp = htons((uint16_t) sum);
 	packet->writeByteArray(offset+6, offset+8, &temp);
 	/* END OF UDP & DATA*/
+
+	return len;
 }
