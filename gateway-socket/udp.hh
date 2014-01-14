@@ -10,6 +10,8 @@
 
 #include "packet.hh"
 #include <netinet/udp.h>
+#include <netinet/ether.h>
+#include <netinet/ip.h>
 
 struct pseudoheader
 {

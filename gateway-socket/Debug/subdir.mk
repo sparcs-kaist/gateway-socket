@@ -12,7 +12,8 @@ CPP_SRCS += \
 ../ip.cpp \
 ../main.cpp \
 ../packet.cpp \
-../socket.cpp 
+../socket.cpp \
+../udp.cpp 
 
 OBJS += \
 ./arp.o \
@@ -23,7 +24,8 @@ OBJS += \
 ./ip.o \
 ./main.o \
 ./packet.o \
-./socket.o 
+./socket.o \
+./udp.o 
 
 CPP_DEPS += \
 ./arp.d \
@@ -34,7 +36,8 @@ CPP_DEPS += \
 ./ip.d \
 ./main.d \
 ./packet.d \
-./socket.d 
+./socket.d \
+./udp.d 
 
 
 # Each subdirectory must supply rules for building sources it contributes

@@ -1,5 +1,6 @@
-#include <netinet/ip.h>
 #include "udp.hh"
+#include "ethernet.hh"
+#include "ip.hh"
 
 UDP::UDP(Packet *packet, int offset)
 {
@@ -35,21 +36,14 @@ void UDP::setDestination(uint16_t dest)
 	packet->writeByteArray(offset+2, offset+4, &tmp);
 }
 
-void UDP::setLength(uint16_t len)
-{
-	uint16_t tmp;
-	tmp = htons(len);
-	packet->writeByteArray(offset+4, offset+6, &tmp);
-}
-
 int UDP::getNextOffset()
 {
 	return this->offset+sizeof(struct udphdr);
 }
 
-static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst, 
-                               struct in_addr ip_src, struct in_addr ip_dst, uint16_t p_src, 
-                               uint16_t p_dst, void *data, int data_len)
+void UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_addr ether_dst,
+	                       struct in_addr ip_src, struct in_addr ip_dst, uint16_t p_src,
+	                       uint16_t p_dst, void *data, size_t data_len)
 {
 	packet = new Packet(sizeof(struct ether_header)+
 	                    sizeof(struct ip)+sizeof(struct pseudoheader)+sizeof(struct udphdr)+data_len);
@@ -95,11 +89,11 @@ static void makePacket(Packet *packet, struct ether_addr ether_src, struct ether
 
 	/* START OF UDP & DATA */
 	struct pseudoheader pheader;
-	pheader->src = iphdr->getSource();
-	pheader->dst = iphdr->getDestination();
-	pheader->zero = 0;
-	pheader->proto = IPPROTO_UDP;
-	pheader->tot = htons(packet->getLength()-offset);
+	pheader.src = iphdr->getSource();
+	pheader.dst = iphdr->getDestination();
+	pheader.zero = 0;
+	pheader.proto = IPPROTO_UDP;
+	pheader.tot_len = htons(packet->getLength()-offset);
 
 	UDP *udphdr = new UDP(packet, offset);
 	udphdr->setSource(p_src);
