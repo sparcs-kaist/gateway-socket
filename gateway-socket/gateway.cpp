@@ -283,10 +283,16 @@ void Gateway::serve(void)
 			if(readLen == -1)
 				break;
 			if(readLen > MTU)
+			{
+				printf("Too long packet(%d) received from inside, turn on the JUMBO MODE\n", readLen);
 				continue;
+			}
 
 			if(readLen < (int)sizeof(struct ether_header))
+			{
+				//printf("short %d\n", __LINE__);//#DEBUG
 				continue;
+			}
 
 			inPacket.setLength(readLen);
 
@@ -306,6 +312,7 @@ void Gateway::serve(void)
 					) )
 				{
 					//filter out
+					//printf("filltered %d\n", __LINE__);//#DEBUG
 					continue;
 				}
 
@@ -313,10 +320,10 @@ void Gateway::serve(void)
 				struct in_addr destIP = arp.getDestinationIP();
 				struct in_addr srcIP = arp.getSourceIP();
 
-				StaticIPMap::const_iterator destIter
+				StaticIPMap::iterator destIter
 				= this->staticIPMap.find(destIP.s_addr);
 
-				StaticIPMap::const_iterator srcIter
+				StaticIPMap::iterator srcIter
 				= this->staticIPMap.find(srcIP.s_addr);
 
 				UserMap::const_iterator userIter
@@ -324,6 +331,7 @@ void Gateway::serve(void)
 
 				if(destIter != staticIPMap.end())
 				{
+					//printf("drop %d\n", __LINE__);////#DEBUG
 					continue; //we don't have to send it outside
 				}
 
@@ -332,18 +340,27 @@ void Gateway::serve(void)
 					//change mac address
 					struct ether_addr source_mac = ethernet.getSource();
 					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+					{
+						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //unauthorized user is using ip
+					}
 					arp.setSourceMAC(srcIter->second);
 					ethernet.setSource(srcIter->second);
 				}
 				else if(srcIter != staticIPMap.end())
+				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //unauthorized user is using our ip
+				}
 			}
 			else if(ethernet.getProtocol() == ETHERTYPE_IP)
 			{
 				IP ip(packet, ethernet.getNextOffset());
 				if(readLen < (ethernet.getNextOffset() + ip.getNextOffset()))
+				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //too short ip packet
+				}
 
 				struct in_addr destIP = ip.getDestination();
 				struct in_addr srcIP = ip.getSource();
@@ -359,6 +376,7 @@ void Gateway::serve(void)
 
 				if(destIter != staticIPMap.end())
 				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //we don't have to send it outside
 				}
 
@@ -367,11 +385,18 @@ void Gateway::serve(void)
 					//change mac address
 					struct ether_addr source_mac = ethernet.getSource();
 					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+					{
+						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //unauthorized user is using ip
+					}
 					ethernet.setSource(srcIter->second);
 				}
 				else if(srcIter != staticIPMap.end())
-					continue; //unauthorized user is using our ip
+				{
+					//printf("unauthorized user is using our ip %d\n", __LINE__);//#DEBUG
+					continue;
+				}
+
 
 				if(ip.getProtocol() == IPPROTO_UDP)
 				{
@@ -392,17 +417,24 @@ void Gateway::serve(void)
 								else if(messageType == 3)
 									request.isDiscover = false;
 								else
+								{
+									//printf("drop %d\n", __LINE__);//#DEBUG
 									continue;
+								}
 								request.gateway = this;
 								request.mac = dhcp.getClientMAC();
 								request.transID = dhcp.getTransactionID();
 
 								struct ether_addr source_mac = ethernet.getSource();
 								if(memcmp(&request.mac, &source_mac, ETH_ALEN) != 0)
+								{
+									//printf("drop %d\n", __LINE__);//#DEBUG
 									continue; //bad mac address
+								}
 
 								db->createDHCP(request);
 							}
+							//printf("drop %d\n", __LINE__);//#DEBUG
 							continue;
 						}
 					}
@@ -418,7 +450,10 @@ void Gateway::serve(void)
 			if(readLen == -1)
 				break;
 			if(readLen > MTU)
+			{
+				printf("Too long packet(%d) received from outside, turn on the JUMBO MODE\n", readLen);
 				continue;
+			}
 			outPacket.setLength(readLen);
 
 			Packet* packet = &outPacket;
@@ -429,14 +464,15 @@ void Gateway::serve(void)
 				struct arphdr arp_header = arp.getHeader();
 
 				if (! (
-						(arp_header.ar_hrd == ARPHRD_ETHER) &&
-						(arp_header.ar_pro == ETHERTYPE_IP) &&
-						(arp_header.ar_op == ARPOP_InREQUEST || ARPOP_InREPLY) &&
-						(arp_header.ar_pln == sizeof(struct in_addr)) &&
+						(arp_header.ar_hrd == ARPHRD_ETHER) &
+						(arp_header.ar_pro == ETHERTYPE_IP) &
+						((arp_header.ar_op == ARPOP_REQUEST) || (arp_header.ar_op == ARPOP_REPLY)) &
+						(arp_header.ar_pln == sizeof(struct in_addr)) &
 						(arp_header.ar_hln == sizeof(struct ether_addr))
 				) )
 				{
 					//filter out
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue;
 				}
 
@@ -454,27 +490,32 @@ void Gateway::serve(void)
 
 				if(srcIter != staticIPMap.end())
 				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //we don't have to bring it inside
 					//someone is using our ip outside
 				}
 
 				if(destIter != staticIPMap.end())
 				{
-					if(userIter == userMap.end())
-						continue; //no such user
-					//change mac address
-					struct ether_addr dest_mac = ethernet.getDestination();
+					if(userIter != userMap.end())
+					{
+						//change mac address
+						struct ether_addr dest_mac = ethernet.getDestination();
 
-					if((memcmp(&destIter->second, &dest_mac, sizeof(struct ether_addr)) != 0)
-						&&
-						(memcmp(ETHER_BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
-						continue; //not broad, not my mac
-					arp.setDestinationMAC(userIter->second->user_mac);
-					ethernet.setDestination(userIter->second->user_mac);
+						if((memcmp(&destIter->second, &dest_mac, sizeof(struct ether_addr)) != 0)
+								&&
+								(memcmp(ETHER_BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
+						{
+							//printf("drop %d\n", __LINE__);//#DEBUG
+							continue; //not broad, not my mac
+						}
+						arp.setDestinationMAC(userIter->second->user_mac);
+						ethernet.setDestination(userIter->second->user_mac);
+					}
 				}
 				else if(userIter != userMap.end())
 				{
-					//we don't have static IP anymore
+					//printf("we don't have static IP anymore\n");//#DEBUG
 					free(userIter->second);
 					userMap.erase(userIter);
 					//TOOD free memory afterwards
@@ -484,7 +525,10 @@ void Gateway::serve(void)
 			{
 				IP ip(packet, ethernet.getNextOffset());
 				if(readLen < (ethernet.getNextOffset() + ip.getNextOffset()))
+				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //too short ip packet
+				}
 
 				struct in_addr destIP = ip.getDestination();
 				struct in_addr srcIP = ip.getSource();
@@ -500,6 +544,7 @@ void Gateway::serve(void)
 
 				if(srcIter != staticIPMap.end())
 				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
 					continue; //we don't have to bring it inside
 					//someone is using our ip outside
 				}
@@ -507,7 +552,10 @@ void Gateway::serve(void)
 				if(destIter != staticIPMap.end())
 				{
 					if(userIter == userMap.end())
+					{
+						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //no such user
+					}
 					//change mac address
 					struct ether_addr dest_mac = ethernet.getDestination();
 
@@ -515,7 +563,11 @@ void Gateway::serve(void)
 							) //no broadcast for specific IP is allowed
 							//&&
 							//(memcmp(BROADCAST, &dest_mac, sizeof(struct ether_addr)) != 0))
+					{
+						//printf("no broadcast for specific IP is allowed\n");
+						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //not broad, not my mac
+					}
 					ethernet.setDestination(userIter->second->user_mac);
 				}
 				else if(userIter != userMap.end())
@@ -531,8 +583,12 @@ void Gateway::serve(void)
 							&& (memcmp(&IPv4_BROADCAST, &destIP, sizeof(struct in_addr)) == 0) )
 					{
 						UDP udp(packet, ip.getNextOffset());
-						if((udp.getSource() == 68) && (udp.getDestination() == 67))
+						if(((udp.getSource() == 68) & (udp.getDestination() == 67))
+								| ((udp.getSource() == 67) & (udp.getDestination() == 68)))
+						{
+							//printf("drop outer DHCP %d\n", __LINE__);//#DEBUG
 							continue;
+						}
 					}
 				}
 			}

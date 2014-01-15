@@ -62,6 +62,23 @@ Device::Device(const char* devName)
 		exit(1);
 	}
 
+	request.ifr_mtu = 9000;
+
+	if (ioctl(sock, SIOCSIFMTU, &request) < 0)
+	{
+		perror ("cannot set mtu");
+		close(sock);
+		exit(1);
+	}
+	printf("MTU %d\n", request.ifr_mtu);
+
+	if (ioctl(sock, SIOCGIFMTU, &request) < 0)
+	{
+		perror ("cannot get mtu");
+		close(sock);
+		exit(1);
+	}
+	printf("MTU %d\n", request.ifr_ifindex);
 
 	if (ioctl(sock, SIOCGIFINDEX, &request) < 0)
 	{

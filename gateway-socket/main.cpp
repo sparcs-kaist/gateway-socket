@@ -189,7 +189,12 @@ int main(int argc, char** argv)
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
 	gateway = new Gateway(in_dev, out_dev, db);
-
+	struct userInfo info;
+	info.ip.s_addr = inet_addr("143.248.48.113");
+	info.last_access = 0;
+	info.timeout = 0;
+	info.user_mac = Ethernet::readMAC("90:2B:34:58:E4:15");
+	gateway->addUserInfo(info);
 
 	vector< pair<struct in_addr, struct ether_addr> > allIP = db->getAllStaticIP();
 	for(vector< pair<struct in_addr, struct ether_addr> >::iterator iter = allIP.begin(); iter != allIP.end(); iter++)
