@@ -32,7 +32,7 @@ typedef unordered_map<uint32_t,struct userInfo*> UserMap;
 
 static void terminate_gateway(int fd, short what, void *arg)
 {
-	printf("recv termination event.\n");
+	printf("Terminating gateway...\n");
 	fflush(0);
 	eventfd_t v;
 	eventfd_read(fd, &v);
@@ -150,6 +150,23 @@ void Gateway::del_user(int fd, short what, void *arg)
 	pthread_mutex_unlock(&gateway->delUserLock);
 }
 
+void Gateway::send_packet(int fd, short what, void *arg)
+{
+	Gateway* gateway = (Gateway*)arg;
+	pthread_mutex_lock(&gateway->sendPacketLock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+	for(eventfd_t count = 0; count < v; count++)
+	{
+		Packet* packet = gateway->sendPacketRequestQueue.front();
+		gateway->sendPacketRequestQueue.pop();
+
+		gateway->inDev->writePacket(packet->inMemory, packet->getLength());
+		delete packet;
+	}
+	pthread_mutex_unlock(&gateway->sendPacketLock);
+}
+
 Gateway::Gateway(const char* inDev, const char* outDev)
 {
 
@@ -160,6 +177,7 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 	pthread_mutex_init(&this->delStaticIPLock, NULL);
 	pthread_mutex_init(&this->addUserLock, NULL);
 	pthread_mutex_init(&this->delUserLock, NULL);
+	pthread_mutex_init(&this->sendPacketLock, NULL);
 
 	termEventFD = eventfd(0,0);
 	if(termEventFD < 0)
@@ -193,6 +211,13 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 		exit(1);
 	}
 
+	sendPacketFD = eventfd(0,0);
+	if(sendPacketFD < 0)
+	{
+		printf("cannot create del user event\n");
+		exit(1);
+	}
+
 
 	evbase = event_base_new();
 	if(evbase == 0)
@@ -216,6 +241,10 @@ Gateway::Gateway(const char* inDev, const char* outDev)
 	struct event *del_user_event = event_new(evbase, delUserEventFD,
 			EV_READ | EV_PERSIST, Gateway::del_user, this);
 	event_add(del_user_event, NULL);
+
+	struct event *send_packet_event = event_new(evbase, sendPacketFD,
+			EV_READ | EV_PERSIST, Gateway::send_packet, this);
+	event_add(send_packet_event, NULL);
 }
 
 Gateway::~Gateway()
@@ -224,6 +253,7 @@ Gateway::~Gateway()
 	pthread_mutex_destroy(&this->delStaticIPLock);
 	pthread_mutex_destroy(&this->addUserLock);
 	pthread_mutex_destroy(&this->delUserLock);
+	pthread_mutex_destroy(&this->sendPacketLock);
 	delete inDev;
 	delete outDev;
 	close(termEventFD);
@@ -231,6 +261,7 @@ Gateway::~Gateway()
 	close(delStaticIPEventFD);
 	close(addUserEventFD);
 	close(delUserEventFD);
+	close(sendPacketFD);
 }
 
 void Gateway::serve(void)
@@ -536,6 +567,7 @@ void Gateway::addUserInfo(struct userInfo info)
 	eventfd_write(this->addUserEventFD, v);
 	pthread_mutex_unlock(&this->addUserLock);
 }
+
 void Gateway::delUserInfo(struct in_addr ip)
 {
 	pthread_mutex_lock(&this->delUserLock);
@@ -543,4 +575,13 @@ void Gateway::delUserInfo(struct in_addr ip)
 	eventfd_t v = 1;
 	eventfd_write(this->delUserEventFD, v);
 	pthread_mutex_unlock(&this->delUserLock);
+}
+
+void Gateway::sendPacketRequest(Packet* packet)
+{
+	pthread_mutex_lock(&this->sendPacketLock);
+	this->sendPacketRequestQueue.push(packet);
+	eventfd_t v = 1;
+	eventfd_write(this->sendPacketFD, v);
+	pthread_mutex_unlock(&this->sendPacketLock);
 }

@@ -40,7 +40,7 @@ struct ether_addr DHCP::getClientMAC()
 	return ret;
 }
 
-int DHCP::writeResponse(Packet* packet, int offset, uint32_t transaction_id, struct in_addr client_in_addr, struct in_addr, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, int lease_time = 7200)
+int DHCP::writeResponse(Packet* packet, int offset, uint32_t transaction_id, struct in_addr client_in_addr, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, int lease_time = 7200)
 {
 	packet->writeByte(offset, 2); // Opcode
 	packet->writeByte(offset+1, 1); // Hardware Type

@@ -42,6 +42,7 @@ public:
 	int setData(void* data, int length);
 
 	friend class Gateway;
+	friend class Database;
 };
 
 #endif /* PACKET_HH_ */

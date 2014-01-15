@@ -23,6 +23,7 @@
 using namespace std;
 
 static Gateway* gateway;
+static Database *db;
 
 static void exit_handle(int num)
 {
@@ -30,7 +31,7 @@ static void exit_handle(int num)
 	fflush(0);
 
 	gateway->terminate();
-	gateway = 0;
+	db->terminate();
 }
 
 static void* serve(void* arg)
@@ -38,6 +39,15 @@ static void* serve(void* arg)
 	Gateway* gateway = (Gateway*)arg;
 
 	gateway->serve();
+
+	return 0;
+}
+
+static void* serve_db(void* arg)
+{
+	Database* database = (Database*)arg;
+
+	database->serve();
 
 	return 0;
 }
@@ -54,7 +64,7 @@ static void help(const char* name)
 
 int main(int argc, char** argv)
 {
-	int neccessary = 4;
+	int neccessary = 7;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
 	signal(SIGINT, exit_handle);
@@ -65,6 +75,11 @@ int main(int argc, char** argv)
 
 	static int long_opt;
 	int option_index;
+
+	struct in_addr gatewayIP;
+	struct in_addr subnetMask;
+	vector<struct in_addr> dnsList;
+
 	static struct option long_options[] =
 	{
 			{"inside", required_argument,        0, 'i'},
@@ -72,6 +87,9 @@ int main(int argc, char** argv)
 			{"db-user",   required_argument,       0, 'u'},
 			{"db-pass",   required_argument,       0, 'p'},
 			{"db-name",   required_argument,       0, 'n'},
+			{"gateway",   required_argument,       &long_opt, 1},
+			{"subnet",   required_argument,       &long_opt, 2},
+			{"dns",   required_argument,       &long_opt, 3},
 			{0, 0, 0, 0}
 	};
 
@@ -90,6 +108,26 @@ int main(int argc, char** argv)
 		{
 			switch(long_opt)
 			{
+			case 1:
+			{
+				neccessary--;
+				gatewayIP.s_addr = inet_addr(optarg);
+				break;
+			}
+			case 2:
+			{
+				neccessary--;
+				subnetMask.s_addr = inet_addr(optarg);
+				break;
+			}
+			case 3:
+			{
+				if(dnsList.size() == 0)
+					neccessary--;
+				struct in_addr temp;
+				temp.s_addr = inet_addr(optarg);
+				dnsList.push_back(temp);
+			}
 			}
 		}
 		else
@@ -140,11 +178,11 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 
-	Database db("localhost", db_user, db_pass, db_name);
-
+	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList);
 	gateway = new Gateway(in_dev, out_dev);
 
-	vector< pair<struct in_addr, struct ether_addr> > allIP = db.getAllStaticIP();
+
+	vector< pair<struct in_addr, struct ether_addr> > allIP = db->getAllStaticIP();
 	for(vector< pair<struct in_addr, struct ether_addr> >::iterator iter = allIP.begin(); iter != allIP.end(); iter++)
 	{
 		struct in_addr in_addr = iter->first;
@@ -154,11 +192,15 @@ int main(int argc, char** argv)
 	}
 
 	pthread_t main_thread;
+	pthread_t db_thread;
 
+	pthread_create(&db_thread, 0, serve_db, db);
 	pthread_create(&main_thread, 0, serve, gateway);
 
 	pthread_join(main_thread, 0);
+	pthread_join(db_thread, 0);
 
 	delete gateway;
+	delete db;
 	return 0;
 }
