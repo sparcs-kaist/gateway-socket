@@ -39,7 +39,7 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 		struct in_addr gatewayIP,
 		struct in_addr subnetMask,
 		const std::vector<struct in_addr> &dnsList,
-		int timeout)
+		uint32_t timeout)
 {
 	this->timeout = timeout;
 	driver = 0;
@@ -160,7 +160,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 							database->gatewayIP,
 							database->subnetMask,
 							database->gatewayIP,
-							database->dnsList, htonl(14400));
+							database->dnsList, 14400);
 					dhcp.setLength(dhcpLen);
 
 					int udpLen = UDP::makePacket(packet, gateway_mac, request.mac,
@@ -173,7 +173,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 					struct userInfo userInfo;
 					userInfo.ip = ip_addr;
 					userInfo.last_access = 0;
-					userInfo.timeout = database->timeout;
+					userInfo.timeout = htonl(database->timeout);
 					userInfo.user_mac = request.mac;
 
 					if(!request.isDiscover)

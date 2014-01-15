@@ -16,8 +16,8 @@
 #include <boost/unordered_map.hpp>
 #include <queue>
 
-#define MTU ETH_FRAME_LEN
-#define IO_BURST 16
+#define MTU (ETH_FRAME_LEN)
+#define IO_BURST 64
 
 struct userInfo
 {

@@ -298,10 +298,10 @@ void Gateway::serve(void)
 				struct arphdr arp_header = arp.getHeader();
 
 				if (! (
-					(arp_header.ar_hrd == ARPHRD_ETHER) &&
-					(arp_header.ar_pro == ETHERTYPE_IP) &&
-					(arp_header.ar_op == ARPOP_InREQUEST || ARPOP_InREPLY) &&
-					(arp_header.ar_pln == sizeof(struct in_addr)) &&
+					(arp_header.ar_hrd == ARPHRD_ETHER) &
+					(arp_header.ar_pro == ETHERTYPE_IP) &
+					((arp_header.ar_op == ARPOP_REQUEST) || (arp_header.ar_op == ARPOP_REPLY)) &
+					(arp_header.ar_pln == sizeof(struct in_addr)) &
 					(arp_header.ar_hln == sizeof(struct ether_addr))
 					) )
 				{
@@ -449,7 +449,7 @@ void Gateway::serve(void)
 				StaticIPMap::const_iterator srcIter
 				= this->staticIPMap.find(srcIP.s_addr);
 
-				UserMap::const_iterator userIter
+				UserMap::iterator userIter
 				= this->userMap.find(destIP.s_addr);
 
 				if(srcIter != staticIPMap.end())
@@ -475,6 +475,7 @@ void Gateway::serve(void)
 				else if(userIter != userMap.end())
 				{
 					//we don't have static IP anymore
+					free(userIter->second);
 					userMap.erase(userIter);
 					//TOOD free memory afterwards
 				}
@@ -523,6 +524,17 @@ void Gateway::serve(void)
 					userMap.erase(userIter);
 					//TOOD free memory afterwards
 				}
+
+				if(ip.getProtocol() == IPPROTO_UDP)
+				{
+					if( (memcmp(&IPv4_NONE, &srcIP, sizeof(struct in_addr)) == 0)
+							&& (memcmp(&IPv4_BROADCAST, &destIP, sizeof(struct in_addr)) == 0) )
+					{
+						UDP udp(packet, ip.getNextOffset());
+						if((udp.getSource() == 68) && (udp.getDestination() == 67))
+							continue;
+					}
+				}
 			}
 
 			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
@@ -530,7 +542,7 @@ void Gateway::serve(void)
 
 
 		if((inBurst == 0) && (outBurst == 0))
-			usleep(1);
+			usleep(0);
 		event_base_loop(evbase, EVLOOP_NONBLOCK);
 	}
 }
