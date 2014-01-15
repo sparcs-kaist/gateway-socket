@@ -39,6 +39,7 @@ private:
 	sql::PreparedStatement* updateAccessTime;
 
 	struct event_base* evbase;
+	int timeout;
 
 	int termEventFD;
 	int createDHCPRequestFD;
@@ -55,7 +56,7 @@ public:
 	Database(const char* host, const char* userName, const char* passwd, const char* dbName,
 			struct in_addr gatewayIP,
 			struct in_addr subnetMask,
-			const std::vector<struct in_addr> &dnsList);
+			const std::vector<struct in_addr> &dnsList, int timeout);
 	~Database();
 
 	std::vector< std::pair<struct in_addr, struct ether_addr> > getAllStaticIP();

@@ -38,8 +38,10 @@ static void terminate_database(int fd, short what, void *arg)
 Database::Database(const char* host, const char* userName, const char* passwd, const char* dbName,
 		struct in_addr gatewayIP,
 		struct in_addr subnetMask,
-		const std::vector<struct in_addr> &dnsList)
+		const std::vector<struct in_addr> &dnsList,
+		int timeout)
 {
+	this->timeout = timeout;
 	driver = 0;
 	conn = 0;
 	selectMACwithIP = 0;
@@ -113,7 +115,6 @@ void Database::create_dhcp(int fd, short what, void *arg)
 	}
 	pthread_mutex_unlock(&database->createDHCPRequestLock);
 
-
 	char mac_buf[32];
 	for( vector<struct dhcp_request>::iterator iter = temp.begin();
 			iter != temp.end();
@@ -146,6 +147,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 				{
 					SQLString mac_str = result2->getString("mac");
 
+
 					struct ether_addr gateway_mac = Ethernet::readMAC(mac_str.c_str());
 					Packet* packet = new Packet(MTU);
 					packet->setLength(MTU);
@@ -168,6 +170,17 @@ void Database::create_dhcp(int fd, short what, void *arg)
 							68, dhcp.inMemory, dhcp.getLength());
 					packet->setLength(udpLen);
 
+					struct userInfo userInfo;
+					userInfo.ip = ip_addr;
+					userInfo.last_access = 0;
+					userInfo.timeout = database->timeout;
+					userInfo.user_mac = request.mac;
+
+					if(!request.isDiscover)
+					{
+						printf("DHCP accepted: MAC(%s), IP(%s)\n", mac_buf, ip_str.c_str());
+						request.gateway->addUserInfo(userInfo);
+					}
 					request.gateway->sendPacketRequest(packet);
 				}
 				result2->close();

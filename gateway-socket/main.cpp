@@ -65,6 +65,7 @@ static void help(const char* name)
 int main(int argc, char** argv)
 {
 	int neccessary = 7;
+	int timeout = 10;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
 	signal(SIGINT, exit_handle);
@@ -87,6 +88,7 @@ int main(int argc, char** argv)
 			{"db-user",   required_argument,       0, 'u'},
 			{"db-pass",   required_argument,       0, 'p'},
 			{"db-name",   required_argument,       0, 'n'},
+			{"timeout",   required_argument,       0, 't'},
 			{"gateway",   required_argument,       &long_opt, 1},
 			{"subnet",   required_argument,       &long_opt, 2},
 			{"dns",   required_argument,       &long_opt, 3},
@@ -97,7 +99,7 @@ int main(int argc, char** argv)
 	while (1)
 	{
 		long_opt = 0;
-		int c = getopt_long (argc, argv, "u:p:i:o:n:",
+		int c = getopt_long (argc, argv, "u:p:i:o:n:t:",
 				long_options, &option_index);
 
 		/* Detect the end of the options. */
@@ -161,6 +163,13 @@ int main(int argc, char** argv)
 				strncpy(db_pass, optarg, sizeof(db_pass));
 				break;
 			}
+			case 't':
+			{
+				timeout = atoi(optarg);
+				if(timeout < 0)
+					timeout = 10;
+				break;
+			}
 			case 'n':
 			{
 				strncpy(db_name, optarg, sizeof(db_name));
@@ -178,7 +187,7 @@ int main(int argc, char** argv)
 		exit(1);
 	}
 
-	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList);
+	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
 	gateway = new Gateway(in_dev, out_dev, db);
 
 
