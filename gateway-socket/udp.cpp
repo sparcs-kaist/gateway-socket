@@ -45,22 +45,21 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	                       struct in_addr ip_src, struct in_addr ip_dst, uint16_t p_src,
 	                       uint16_t p_dst, const void *data, size_t data_len)
 {
-	int len = sizeof(struct ether_header)+
-            sizeof(struct ip)+sizeof(struct pseudoheader)+sizeof(struct udphdr)+data_len;
+	int len = totalHeaderLen+data_len;
 	if(len > packet->getCapacity())
 		return -1;
 	int offset = 0;
 
 	/* START OF ETHERNET */
-	Ethernet *ethhdr = new Ethernet(packet, offset);
-	ethhdr->setSource(ether_src);
-	ethhdr->setDestination(ether_dst);
-	ethhdr->setProtocol(ETHERTYPE_IP);
-	offset = ethhdr->getNextOffset();
+	Ethernet ethhdr(packet, offset);
+	ethhdr.setSource(ether_src);
+	ethhdr.setDestination(ether_dst);
+	ethhdr.setProtocol(ETHERTYPE_IP);
+	offset = ethhdr.getNextOffset();
 	/* END OF ETHERNET */
 
 	/* START OF IP */
-	IP *iphdr = new IP(packet, offset);
+	IP iphdr(packet, offset);
 	struct ip thdr;
 	thdr.ip_hl = 5;
 	thdr.ip_v = 4;
@@ -91,11 +90,11 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 
 	/* START OF UDP & DATA */
 	struct pseudoheader pheader;
-	pheader.src = iphdr->getSource();
-	pheader.dst = iphdr->getDestination();
+	pheader.src = iphdr.getSource();
+	pheader.dst = iphdr.getDestination();
 	pheader.zero = 0;
 	pheader.proto = IPPROTO_UDP;
-	pheader.tot_len = htons(len-offset);
+	pheader.tot_len = htons(sizeof(struct udphdr) + data_len);
 
 	UDP *udphdr = new UDP(packet, offset);
 	udphdr->setSource(p_src);
@@ -119,7 +118,7 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 		sum += ntohs(*pointer);
 		pointer++;
 	}
-	int current = offset;
+	int current = offset - sizeof(struct udphdr);
 	while(current < len)
 	{
 		if ((current+1) == len)
@@ -128,15 +127,18 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 			temp = temp << 8;
 		}
 		else
+		{
 			packet->readByteArray(current, current+2, &temp);
+			temp = ntohs(temp);
+		}
 
-		sum += ntohs(temp);
+		sum += temp;
 		current += 2;
 	}
 	sum = (sum >> 16) + (sum & 0xFFFF);
 	sum += (sum >> 16);
 	temp = htons(~((uint16_t) sum));
-	packet->writeByteArray(offset+6, offset+8, &temp);
+	packet->writeByteArray(offset-2, offset, &temp);
 	/* END OF UDP & DATA*/
 
 	return len;
