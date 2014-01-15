@@ -189,7 +189,7 @@ int main(int argc, char** argv)
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
 	gateway = new Gateway(in_dev, out_dev, db);
-	struct userInfo info;
+	struct userInfo info; //XXX exeperimental
 	info.ip.s_addr = inet_addr("143.248.48.113");
 	info.last_access = 0;
 	info.timeout = 0;
