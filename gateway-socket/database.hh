@@ -24,6 +24,7 @@ struct dhcp_request
 	struct ether_addr mac;
 	uint32_t transID;
 	Gateway* gateway;
+	bool isDiscover;
 };
 
 class Database

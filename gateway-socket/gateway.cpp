@@ -12,6 +12,7 @@
 #include "ip.hh"
 #include "udp.hh"
 #include "dhcp.hh"
+#include "database.hh"
 
 #include <sys/eventfd.h>
 #include <event.h>
@@ -167,11 +168,12 @@ void Gateway::send_packet(int fd, short what, void *arg)
 	pthread_mutex_unlock(&gateway->sendPacketLock);
 }
 
-Gateway::Gateway(const char* inDev, const char* outDev)
+Gateway::Gateway(const char* inDev, const char* outDev, Database* db)
 {
 
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
+	this->db = db;
 
 	pthread_mutex_init(&this->addStaticIPLock, NULL);
 	pthread_mutex_init(&this->delStaticIPLock, NULL);
@@ -283,8 +285,7 @@ void Gateway::serve(void)
 			if(readLen > MTU)
 				continue;
 
-			struct ether_header header;
-			if(readLen < (int)sizeof(header))
+			if(readLen < (int)sizeof(struct ether_header))
 				continue;
 
 			inPacket.setLength(readLen);
@@ -381,25 +382,26 @@ void Gateway::serve(void)
 						if((udp.getSource() == 68) && (udp.getDestination() == 67))
 						{
 							DHCP dhcp(packet, udp.getNextOffset());
-							char mac_buf[32];
-							Ethernet::printMAC(dhcp.getClientMAC(), mac_buf, sizeof(mac_buf));
-							printf("DHCP received: OP(%d), MAC(%s), ID(%X)\n", dhcp.getOpcode(), mac_buf, dhcp.getTransactionID());
-
-							//XXX udp test code
-							Packet forSend(MTU);
-							forSend.setLength(MTU);
-							struct ether_addr temp_mac = Ethernet::readMAC("AA:BB:CC:DD:EE:FF");
-
-							const char* str = "HELLO UDP";
-							struct in_addr src_ip;
-							src_ip.s_addr = inet_addr("192.168.0.1");
-							struct in_addr dst_ip;
-							dst_ip.s_addr = inet_addr("255.255.255.255");
-							int len = UDP::makePacket(&forSend, temp_mac, dhcp.getClientMAC(), src_ip, dst_ip, 1234, 5678, str, 9);
-							if(len > 0)
+							if(dhcp.getOpcode() == 1)
 							{
-								forSend.setLength(len);
-								inDev->writePacket(forSend.inMemory, forSend.getLength());
+								int messageType = dhcp.getMessageType();
+
+								struct dhcp_request request;
+								if(messageType == 1)
+									request.isDiscover = true;
+								else if(messageType == 3)
+									request.isDiscover = false;
+								else
+									continue;
+								request.gateway = this;
+								request.mac = dhcp.getClientMAC();
+								request.transID = dhcp.getTransactionID();
+
+								struct ether_addr source_mac = ethernet.getSource();
+								if(memcmp(&request.mac, &source_mac, ETH_ALEN) != 0)
+									continue; //bad mac address
+
+								db->createDHCP(request);
 							}
 							continue;
 						}

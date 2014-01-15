@@ -27,11 +27,15 @@ struct userInfo
 	long timeout;
 };
 
+class Database;
+
 class Gateway
 {
 private:
 	Device *inDev;
 	Device *outDev;
+	Database* db;
+
 	struct event_base* evbase;
 
 	int termEventFD;
@@ -70,7 +74,7 @@ private:
 	static void send_packet(int fd, short what, void *arg);
 
 public:
-	Gateway(const char* inDev, const char* outDev);
+	Gateway(const char* inDev, const char* outDev, Database* db);
 	~Gateway();
 
 	void serve(void);

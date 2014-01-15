@@ -121,7 +121,8 @@ void Database::create_dhcp(int fd, short what, void *arg)
 			)
 	{
 		struct dhcp_request request = *iter;
-
+		Ethernet::printMAC(request.mac, mac_buf, sizeof(mac_buf));
+		printf("DHCP received: MAC(%s), ID(%X)\n", mac_buf, ntohl(request.transID));
 		try
 		{
 			database->selectUserIPfromMAC->clearParameters();
@@ -151,12 +152,13 @@ void Database::create_dhcp(int fd, short what, void *arg)
 
 					Packet dhcp(MTU);
 					dhcp.setLength(MTU - UDP::totalHeaderLen);
-					int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.transID,
+					int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.isDiscover,
+							request.transID,
 							ip_addr, request.mac,
 							database->gatewayIP,
 							database->subnetMask,
 							database->gatewayIP,
-							database->dnsList, 14400);
+							database->dnsList, htonl(14400));
 					dhcp.setLength(dhcpLen);
 
 					int udpLen = UDP::makePacket(packet, gateway_mac, request.mac,

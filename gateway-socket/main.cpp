@@ -179,7 +179,7 @@ int main(int argc, char** argv)
 	}
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList);
-	gateway = new Gateway(in_dev, out_dev);
+	gateway = new Gateway(in_dev, out_dev, db);
 
 
 	vector< pair<struct in_addr, struct ether_addr> > allIP = db->getAllStaticIP();
