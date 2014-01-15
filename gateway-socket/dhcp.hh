@@ -26,7 +26,7 @@ public:
 	struct ether_addr getClientMAC();
 	int getMessageType();
 
-	static int writeResponse(Packet* packet, int offset, bool discover, uint32_t transaction_id, struct in_addr client, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, uint32_t lease_time);
+	static int writeResponse(Packet* packet, int offset, bool discover, uint16_t mtu, uint32_t transaction_id, struct in_addr client, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, uint32_t lease_time);
 };
 
 #endif

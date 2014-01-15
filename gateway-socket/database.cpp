@@ -155,6 +155,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 					Packet dhcp(MTU);
 					dhcp.setLength(MTU - UDP::totalHeaderLen);
 					int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.isDiscover,
+							htons(request.mtu),
 							request.transID,
 							ip_addr, request.mac,
 							database->gatewayIP,

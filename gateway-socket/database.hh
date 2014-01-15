@@ -23,6 +23,7 @@ struct dhcp_request
 {
 	struct ether_addr mac;
 	uint32_t transID;
+	uint16_t mtu;
 	Gateway* gateway;
 	bool isDiscover;
 };

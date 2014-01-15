@@ -46,6 +46,7 @@ private:
 	int delUserEventFD;
 
 	int sendPacketFD;
+	int mtu;
 
 	pthread_mutex_t addStaticIPLock;
 	pthread_mutex_t delStaticIPLock;

@@ -45,7 +45,7 @@ int DHCP::getMessageType()
 	return packet->readByte(offset + 242);
 }
 
-int DHCP::writeResponse(Packet* packet, int offset, bool discover, uint32_t transaction_id, struct in_addr client_in_addr, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, uint32_t lease_time)
+int DHCP::writeResponse(Packet* packet, int offset, bool discover, uint16_t MTU, uint32_t transaction_id, struct in_addr client_in_addr, ether_addr client_ether_addr, struct in_addr server_identifier, struct in_addr subnet_mask, struct in_addr router, std::vector<struct in_addr> dns_vector, uint32_t lease_time)
 {
 	int current_offset = offset;
 	packet->writeByte(current_offset++, 2); // Opcode
@@ -114,6 +114,12 @@ int DHCP::writeResponse(Packet* packet, int offset, bool discover, uint32_t tran
 	packet->writeByte(current_offset++, 4);
 	packet->writeByteArray(current_offset, current_offset+4, &router); // Router
 	current_offset+=4;
+
+	packet->writeByte(current_offset++, 26);
+	packet->writeByte(current_offset++, 2);
+
+	packet->writeByteArray(current_offset, current_offset+2, &MTU); // MTU
+	current_offset+=2;
 
 	packet->writeByte(current_offset++, 6);
 	packet->writeByte(current_offset++, dns_vector.size() * 4); //prepare DNS

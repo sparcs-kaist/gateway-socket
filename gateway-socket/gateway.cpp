@@ -174,6 +174,7 @@ Gateway::Gateway(const char* inDev, const char* outDev, Database* db)
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
 	this->db = db;
+	this->mtu = MTU;
 
 	pthread_mutex_init(&this->addStaticIPLock, NULL);
 	pthread_mutex_init(&this->delStaticIPLock, NULL);
@@ -422,6 +423,7 @@ void Gateway::serve(void)
 									continue;
 								}
 								request.gateway = this;
+								request.mtu = this->mtu;
 								request.mac = dhcp.getClientMAC();
 								request.transID = dhcp.getTransactionID();
 
@@ -441,7 +443,13 @@ void Gateway::serve(void)
 				}
 			}
 
-			outDev->writePacket(inPacket.inMemory, inPacket.getLength());
+
+			int writeLen = inPacket.getLength();
+			int actualLen = outDev->writePacket(inPacket.inMemory, inPacket.getLength());
+			if(writeLen != actualLen)
+			{
+				printf("expect: %d, actual %d (in).\n", writeLen, actualLen);
+			}
 		}
 
 		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
@@ -593,7 +601,12 @@ void Gateway::serve(void)
 				}
 			}
 
-			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
+			int writeLen = outPacket.getLength();
+			int actualLen = inDev->writePacket(outPacket.inMemory, writeLen);
+			if(writeLen != actualLen)
+			{
+				printf("expect: %d, actual %d (out).\n", writeLen, actualLen);
+			}
 		}
 
 
