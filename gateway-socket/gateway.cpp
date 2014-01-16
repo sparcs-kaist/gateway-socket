@@ -174,7 +174,6 @@ Gateway::Gateway(const char* inDev, const char* outDev, Database* db)
 	this->inDev = new Device(inDev);
 	this->outDev = new Device(outDev);
 	this->db = db;
-	this->mtu = MTU;
 
 	pthread_mutex_init(&this->addStaticIPLock, NULL);
 	pthread_mutex_init(&this->delStaticIPLock, NULL);
@@ -272,18 +271,18 @@ void Gateway::serve(void)
 	const unsigned char ETHER_BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
 	const struct in_addr IPv4_BROADCAST = { 0xFFFFFFFF };
 	const struct in_addr IPv4_NONE = { 0x00000000 };
-	Packet inPacket(MTU);
-	Packet outPacket(MTU);
+	Packet inPacket(MY_PACKET_LEN);
+	Packet outPacket(MY_PACKET_LEN);
 
 	while(!event_base_got_exit(evbase))
 	{
 		int inBurst, outBurst;
 		for(inBurst = 0; inBurst < IO_BURST; inBurst++)
 		{
-			int readLen = inDev->readPacket(inPacket.inMemory,MTU);
+			int readLen = inDev->readPacket(inPacket.inMemory,MY_PACKET_LEN);
 			if(readLen == -1)
 				break;
-			if(readLen > MTU)
+			if(readLen > MY_PACKET_LEN)
 			{
 				printf("Too long packet(%d) received from inside, turn on the JUMBO MODE\n", readLen);
 				continue;
@@ -423,7 +422,7 @@ void Gateway::serve(void)
 									continue;
 								}
 								request.gateway = this;
-								request.mtu = this->mtu;
+								request.mtu = MY_MTU;
 								request.mac = dhcp.getClientMAC();
 								request.transID = dhcp.getTransactionID();
 
@@ -454,10 +453,10 @@ void Gateway::serve(void)
 
 		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
 		{
-			int readLen = outDev->readPacket(outPacket.inMemory,MTU);
+			int readLen = outDev->readPacket(outPacket.inMemory,MY_PACKET_LEN);
 			if(readLen == -1)
 				break;
-			if(readLen > MTU)
+			if(readLen > MY_PACKET_LEN)
 			{
 				printf("Too long packet(%d) received from outside, turn on the JUMBO MODE\n", readLen);
 				continue;

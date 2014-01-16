@@ -149,11 +149,11 @@ void Database::create_dhcp(int fd, short what, void *arg)
 
 
 					struct ether_addr gateway_mac = Ethernet::readMAC(mac_str.c_str());
-					Packet* packet = new Packet(MTU);
-					packet->setLength(MTU);
+					Packet* packet = new Packet(MY_PACKET_LEN);
+					packet->setLength(MY_PACKET_LEN);
 
-					Packet dhcp(MTU);
-					dhcp.setLength(MTU - UDP::totalHeaderLen);
+					Packet dhcp(MY_PACKET_LEN);
+					dhcp.setLength(MY_PACKET_LEN - UDP::totalHeaderLen);
 					int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.isDiscover,
 							htons(request.mtu),
 							request.transID,

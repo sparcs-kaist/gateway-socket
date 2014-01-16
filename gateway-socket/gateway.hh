@@ -16,7 +16,8 @@
 #include <boost/unordered_map.hpp>
 #include <queue>
 
-#define MTU (9000)
+#define MY_MTU ETH_DATA_LEN
+#define MY_PACKET_LEN ETH_FRAME_LEN
 #define IO_BURST 32
 
 struct userInfo
@@ -46,7 +47,6 @@ private:
 	int delUserEventFD;
 
 	int sendPacketFD;
-	int mtu;
 
 	pthread_mutex_t addStaticIPLock;
 	pthread_mutex_t delStaticIPLock;
