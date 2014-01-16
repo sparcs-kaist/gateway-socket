@@ -62,7 +62,7 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 		selectMACwithIP = conn->prepareStatement("SELECT `mac` FROM `static_ip` WHERE `ip` = ?");
 		selectAllIP = conn->prepareStatement("SELECT * FROM `static_ip`");
 		selectUserIPfromMAC = conn->prepareStatement("SELECT `ip` FROM `user` WHERE `mac` = ?");
-		updateAccessTime = conn->prepareStatement("UPDATE `user` SET `accessed` = NOW() WHERE `mac` = ?");
+		updateAccessTime = conn->prepareStatement("UPDATE `user` SET `accessed` = ? WHERE `mac` = ?");
 	}
 	catch(sql::SQLException &e)
 	{
@@ -84,10 +84,18 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 		exit(1);
 	}
 
+	updateTimeFD = eventfd(0,0);
+	if(updateTimeFD < 0)
+	{
+		printf("cannot update time event.\n");
+		exit(1);
+	}
+
 	evbase = event_base_new();
 	if(evbase == 0)
 		exit(1);
 	pthread_mutex_init(&createDHCPRequestLock, 0);
+	pthread_mutex_init(&updateTimeLock, 0);
 
 	struct event *term_event = event_new(evbase, termEventFD,
 			EV_READ, terminate_database, evbase);
@@ -96,6 +104,51 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 	struct event *dhcp_event = event_new(evbase, createDHCPRequestFD,
 			EV_READ | EV_PERSIST, Database::create_dhcp, this);
 	event_add(dhcp_event, 0);
+
+	struct event *update_event = event_new(evbase, updateTimeFD,
+			EV_READ | EV_PERSIST, Database::update_time, this);
+	event_add(update_event, 0);
+}
+
+void Database::update_time(int fd, short what, void *arg)
+{
+	Database* database = (Database*)arg;
+
+	vector<struct update_time> temp;
+	pthread_mutex_lock(&database->updateTimeLock);
+	eventfd_t v;
+	eventfd_read(fd, &v);
+
+	for(eventfd_t count = 0; count < v; count++)
+	{
+		temp.push_back(database->updateTimeQueue.front());
+		database->updateTimeQueue.pop();
+	}
+	pthread_mutex_unlock(&database->updateTimeLock);
+
+	char mac_buf[32];
+	for( vector<struct update_time>::iterator iter = temp.begin();
+			iter != temp.end();
+			iter++
+	)
+	{
+		struct update_time request = *iter;
+
+		Ethernet::printMAC(request.mac, mac_buf, sizeof(mac_buf));
+
+		try
+		{
+			database->updateAccessTime->clearParameters();
+			database->updateAccessTime->setUInt64(1, request.UTC);
+			database->updateAccessTime->setString(2, mac_buf);
+			database->updateAccessTime->executeUpdate();
+		}
+		catch(sql::SQLException &e)
+		{
+			printf("SQL error on updating time(%d): %s\n", e.getErrorCode(), e.getSQLStateCStr());
+			exit(1);
+		}
+	}
 }
 
 void Database::create_dhcp(int fd, short what, void *arg)
@@ -174,7 +227,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 					struct userInfo userInfo;
 					userInfo.ip = ip_addr;
 					userInfo.last_access = 0;
-					userInfo.timeout = htonl(database->timeout);
+					userInfo.timeout = database->timeout;
 					userInfo.user_mac = request.mac;
 
 					if(!request.isDiscover)
@@ -246,6 +299,18 @@ void Database::createDHCP(const struct dhcp_request &request)
 	eventfd_write(this->createDHCPRequestFD, v);
 
 	pthread_mutex_unlock(&this->createDHCPRequestLock);
+}
+
+void Database::updateTime(const struct update_time &request)
+{
+	pthread_mutex_lock(&this->updateTimeLock);
+
+	updateTimeQueue.push(request);
+
+	eventfd_t v = 1;
+	eventfd_write(this->updateTimeFD, v);
+
+	pthread_mutex_unlock(&this->updateTimeLock);
 }
 
 void Database::serve()

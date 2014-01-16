@@ -273,12 +273,17 @@ void Gateway::serve(void)
 	const struct in_addr IPv4_NONE = { 0x00000000 };
 	Packet inPacket(MY_PACKET_LEN);
 	Packet outPacket(MY_PACKET_LEN);
+	uint64_t current_time = 0;
+	struct timeval temp_time;
 
 	while(!event_base_got_exit(evbase))
 	{
+		gettimeofday(&temp_time, 0);
+		current_time = (temp_time.tv_sec * 1000) + (temp_time.tv_usec / 1000);
 		int inBurst, outBurst;
 		for(inBurst = 0; inBurst < IO_BURST; inBurst++)
 		{
+			struct userInfo* user = 0;
 			int readLen = inDev->readPacket(inPacket.inMemory,MY_PACKET_LEN);
 			if(readLen == -1)
 				break;
@@ -344,6 +349,7 @@ void Gateway::serve(void)
 						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //unauthorized user is using ip
 					}
+					user = userIter->second;
 					arp.setSourceMAC(srcIter->second);
 					ethernet.setSource(srcIter->second);
 				}
@@ -389,6 +395,7 @@ void Gateway::serve(void)
 						//printf("drop %d\n", __LINE__);//#DEBUG
 						continue; //unauthorized user is using ip
 					}
+					user = userIter->second;
 					ethernet.setSource(srcIter->second);
 				}
 				else if(srcIter != staticIPMap.end())
@@ -441,14 +448,18 @@ void Gateway::serve(void)
 					}
 				}
 			}
-
-
-			int writeLen = inPacket.getLength();
-			int actualLen = outDev->writePacket(inPacket.inMemory, inPacket.getLength());
-			if(writeLen != actualLen)
+			if(user)
 			{
-				printf("expect: %d, actual %d (in).\n", writeLen, actualLen);
+				if((user->last_access + user->timeout) < current_time)
+				{
+					user->last_access = current_time;
+					struct update_time request;
+					request.mac = user->user_mac;
+					request.UTC = current_time;
+					db->updateTime(request);
+				}
 			}
+			outDev->writePacket(inPacket.inMemory, inPacket.getLength());
 		}
 
 		for(outBurst = 0; outBurst < IO_BURST; outBurst++)
@@ -600,12 +611,7 @@ void Gateway::serve(void)
 				}
 			}
 
-			int writeLen = outPacket.getLength();
-			int actualLen = inDev->writePacket(outPacket.inMemory, writeLen);
-			if(writeLen != actualLen)
-			{
-				printf("expect: %d, actual %d (out).\n", writeLen, actualLen);
-			}
+			inDev->writePacket(outPacket.inMemory, outPacket.getLength());
 		}
 
 

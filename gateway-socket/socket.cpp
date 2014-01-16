@@ -21,6 +21,7 @@
 #include <memory.h>
 #include <stdlib.h>
 #include <sys/socket.h>
+#include "gateway.hh"
 
 Device::Device(const char* devName)
 {
@@ -62,7 +63,7 @@ Device::Device(const char* devName)
 		exit(1);
 	}
 
-	request.ifr_mtu = 9000;
+	request.ifr_mtu = MY_MTU;
 
 	if (ioctl(sock, SIOCSIFMTU, &request) < 0)
 	{
@@ -70,7 +71,6 @@ Device::Device(const char* devName)
 		close(sock);
 		exit(1);
 	}
-	printf("MTU %d\n", request.ifr_mtu);
 
 	if (ioctl(sock, SIOCGIFMTU, &request) < 0)
 	{

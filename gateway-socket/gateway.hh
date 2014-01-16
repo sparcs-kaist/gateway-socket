@@ -24,8 +24,8 @@ struct userInfo
 {
 	struct in_addr ip;
 	struct ether_addr user_mac;
-	time_t last_access;
-	long timeout;
+	uint64_t last_access;
+	uint64_t timeout;
 };
 
 class Database;

@@ -19,6 +19,12 @@
 
 class Gateway;
 
+struct update_time
+{
+	struct ether_addr mac;
+	uint64_t UTC;
+};
+
 struct dhcp_request
 {
 	struct ether_addr mac;
@@ -47,11 +53,16 @@ private:
 	std::queue<struct dhcp_request> createDHCPRequestQueue;
 	pthread_mutex_t createDHCPRequestLock;
 
+	std::queue<struct update_time> updateTimeQueue;
+	pthread_mutex_t updateTimeLock;
+	int updateTimeFD;
+
 	struct in_addr gatewayIP;
 	struct in_addr subnetMask;
 	std::vector<struct in_addr> dnsList;
 
 	static void create_dhcp(int fd, short what, void *arg);
+	static void update_time(int fd, short what, void *arg);
 
 public:
 	Database(const char* host, const char* userName, const char* passwd, const char* dbName,
@@ -63,6 +74,7 @@ public:
 	std::vector< std::pair<struct in_addr, struct ether_addr> > getAllStaticIP();
 
 	void createDHCP(const struct dhcp_request &request);
+	void updateTime(const struct update_time &request);
 
 	void terminate();
 

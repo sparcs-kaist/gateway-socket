@@ -57,7 +57,10 @@ static void help(const char* name)
 	printf("Usage : %s options\n", name);
 	printf("--inside -i [inside device name]\n"
 			"--outside -o [outside device name]\n"
-			"--static-ip -s [config file for static IP]\n"
+			"--gateway [gateway IP]\n"
+			"--subnet [subnet IP]\n"
+			"--dns [dns IP] [--dns another]\n"
+			"--timeout -t [timeout(milli)]\n"
 			"--help\n");
 	exit(1);
 }
@@ -65,7 +68,7 @@ static void help(const char* name)
 int main(int argc, char** argv)
 {
 	int neccessary = 7;
-	int timeout = 10;
+	int timeout = 15000;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
 	signal(SIGINT, exit_handle);
@@ -167,7 +170,7 @@ int main(int argc, char** argv)
 			{
 				timeout = atoi(optarg);
 				if(timeout < 0)
-					timeout = 10;
+					timeout = 15000;
 				break;
 			}
 			case 'n':
@@ -189,12 +192,6 @@ int main(int argc, char** argv)
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
 	gateway = new Gateway(in_dev, out_dev, db);
-	struct userInfo info; //XXX exeperimental
-	info.ip.s_addr = inet_addr("143.248.48.114");
-	info.last_access = 0;
-	info.timeout = 0;
-	info.user_mac = Ethernet::readMAC("90:2B:34:58:E4:15");
-	gateway->addUserInfo(info);
 
 	vector< pair<struct in_addr, struct ether_addr> > allIP = db->getAllStaticIP();
 	for(vector< pair<struct in_addr, struct ether_addr> >::iterator iter = allIP.begin(); iter != allIP.end(); iter++)
