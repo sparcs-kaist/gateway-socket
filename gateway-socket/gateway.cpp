@@ -24,6 +24,7 @@
 #include <memory.h>
 #include <queue>
 #include <arpa/inet.h>
+#include <netinet/ip_icmp.h>
 
 using namespace std;
 using namespace boost;
@@ -266,6 +267,100 @@ Gateway::~Gateway()
 	close(sendPacketFD);
 }
 
+static uint16_t one_compl(const void* start, const int len)
+{
+	const uint16_t *pointer = (const uint16_t*)start;
+	const void* end = (const char*)start + len;
+	uint32_t sum = 0;
+	while((const void *) pointer < end)
+	{
+		sum += ntohs(*pointer);
+		pointer++;
+	}
+	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum += (sum >> 16);
+	return htons(~((uint16_t) sum));
+}
+
+struct icmp_too_big
+{
+	struct icmphdr header;
+	struct ip ip;
+	char data[8];
+}__attribute__ ((__packed__));
+
+void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
+{
+	int current_offset = 0;
+	if(packet->getLength() < (int)(sizeof(struct ether_header) + sizeof(struct ip) + 8))
+	{
+		printf("plen %d\n", packet->getLength());
+		return;
+	}
+
+
+	Ethernet r_ethernet(packet);
+	if(r_ethernet.getProtocol() != ETHERTYPE_IP)
+	{
+		printf("proto %d\n", r_ethernet.getProtocol());
+		return;
+	}
+
+	IP r_ip(packet, sizeof(struct ether_header));
+	int ip_hlen = r_ip.getNextOffset() - sizeof(struct ether_header);
+	if(ip_hlen != 20)
+	{
+		printf("hlen %d\n", ip_hlen);
+		return;
+	}
+
+	Packet s_packet(sizeof(struct ether_header) + sizeof(struct icmp_too_big) + sizeof(struct ip));
+	s_packet.setLength(sizeof(struct ether_header) + sizeof(struct icmp_too_big) + sizeof(struct ip));
+	struct icmp_too_big response;
+	memset(&response, 0, sizeof(response));
+	response.header.type = ICMP_DEST_UNREACH;
+	response.header.code = ICMP_FRAG_NEEDED;
+	response.header.un.frag.mtu = htons(MTU);
+
+	packet->readByteArray(sizeof(struct ether_header),sizeof(struct ether_header) + sizeof(struct ip)+8, &response.ip);
+	response.header.checksum = one_compl(&response, sizeof(response));
+
+	Ethernet s_ethernet(&s_packet);
+	s_ethernet.setSource(r_ethernet.getDestination());
+	s_ethernet.setDestination(r_ethernet.getSource());
+	s_ethernet.setProtocol(ETHERTYPE_IP);
+
+
+
+	/* START OF IP */
+	struct ip s_ip_hdr;
+	s_ip_hdr.ip_hl = 5;
+	s_ip_hdr.ip_v = 4;
+	s_ip_hdr.ip_tos = 0;
+	s_ip_hdr.ip_len = htons(sizeof(struct ip)+sizeof(struct icmp_too_big));
+	s_ip_hdr.ip_id = 0;
+	s_ip_hdr.ip_off = htons(IP_DF);
+	s_ip_hdr.ip_ttl = 64;
+	s_ip_hdr.ip_p = IPPROTO_ICMP;
+	s_ip_hdr.ip_sum = 0;
+	s_ip_hdr.ip_src.s_addr = inet_addr("143.248.48.1");//r_ip.getDestination();//inet_addr("143.248.48.1");
+	s_ip_hdr.ip_dst = r_ip.getSource();
+
+	s_ip_hdr.ip_sum = one_compl(&s_ip_hdr, sizeof(s_ip_hdr));
+
+	current_offset = sizeof(struct ether_header);
+
+	s_packet.writeByteArray(current_offset, current_offset + sizeof(struct ip), &s_ip_hdr);
+	current_offset += sizeof(struct ip);
+
+	s_packet.writeByteArray(current_offset, current_offset + sizeof(struct icmp_too_big), &response);
+	current_offset += sizeof(struct icmp_too_big);
+
+	dev->writePacket(s_packet.inMemory, s_packet.getLength());
+	printf("ICMP sent.\n");
+	/* END OF IP */
+}
+
 void Gateway::serve(void)
 {
 	const unsigned char ETHER_BROADCAST[6] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,};
@@ -289,7 +384,9 @@ void Gateway::serve(void)
 				break;
 			if(readLen > MY_PACKET_LEN)
 			{
-				printf("Too long packet(%d) received from inside, turn on the JUMBO MODE\n", readLen);
+				inPacket.setLength(MY_PACKET_LEN);
+				printf("Too long packet(%d) received from inside, send ICMP\n", readLen);
+				icmp_mtu(inDev, &inPacket, MY_MTU);
 				continue;
 			}
 
@@ -469,7 +566,9 @@ void Gateway::serve(void)
 				break;
 			if(readLen > MY_PACKET_LEN)
 			{
-				printf("Too long packet(%d) received from outside, turn on the JUMBO MODE\n", readLen);
+				outPacket.setLength(MY_PACKET_LEN);
+				printf("Too long packet(%d) received from outside, send ICMP\n", readLen);
+				icmp_mtu(outDev, &outPacket, MY_MTU);
 				continue;
 			}
 			outPacket.setLength(readLen);

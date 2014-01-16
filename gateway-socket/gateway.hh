@@ -17,7 +17,7 @@
 #include <queue>
 
 #define MY_MTU ETH_DATA_LEN
-#define MY_PACKET_LEN ETH_FRAME_LEN
+#define MY_PACKET_LEN (ETH_FRAME_LEN+128)
 #define IO_BURST 32
 
 struct userInfo
@@ -71,6 +71,7 @@ private:
 	static void del_static_ip(int fd, short what, void *arg);
 	static void add_user(int fd, short what, void *arg);
 	static void del_user(int fd, short what, void *arg);
+	static void icmp_mtu(Device* dev, Packet* packet, uint16_t MTU);
 
 	static void send_packet(int fd, short what, void *arg);
 

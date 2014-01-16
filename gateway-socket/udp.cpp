@@ -66,7 +66,7 @@ int UDP::makePacket(Packet *packet, struct ether_addr ether_src, struct ether_ad
 	thdr.ip_tos = 0;
 	thdr.ip_len = htons(sizeof(struct ip)+sizeof(struct udphdr)+data_len);
 	thdr.ip_id = 0;
-	thdr.ip_off = 0;
+	thdr.ip_off = htons(IP_DF);
 	thdr.ip_ttl = 64;
 	thdr.ip_p = IPPROTO_UDP;
 	thdr.ip_sum = 0;

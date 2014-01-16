@@ -55,7 +55,7 @@ Device::Device(const char* devName)
 	prevFlag = request.ifr_flags;
 
 
-	request.ifr_flags = IFF_UP | IFF_BROADCAST | IFF_NOARP | IFF_PROMISC;
+	request.ifr_flags = IFF_UP | IFF_BROADCAST | IFF_NOARP | IFF_NOTRAILERS | IFF_PROMISC | IFF_POINTOPOINT;
 	if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
 	{
 		perror ("cannot set dev");
