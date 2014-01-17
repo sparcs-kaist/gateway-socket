@@ -345,7 +345,7 @@ void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
 	s_ip_hdr.ip_ttl = 64;
 	s_ip_hdr.ip_p = IPPROTO_ICMP;
 	s_ip_hdr.ip_sum = 0;
-	s_ip_hdr.ip_src.s_addr = r_ip.getDestination();//inet_addr("143.248.48.1");
+	s_ip_hdr.ip_src = r_ip.getDestination();//inet_addr("143.248.48.1");
 	s_ip_hdr.ip_dst = r_ip.getSource();
 
 	s_ip_hdr.ip_sum = one_compl(&s_ip_hdr, sizeof(s_ip_hdr));
