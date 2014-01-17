@@ -213,7 +213,7 @@ int main(int argc, char** argv)
 	syslog(LOG_INFO, "%s daemon starting up", DAEMON_NAME);
 
 	setlogmask(LOG_UPTO(LOG_INFO));
-	openlog(DAEMON_NAME, LOG_CONS | LOG_PERROR, LOG_USER);
+	openlog(DAEMON_NAME, LOG_CONS | LOG_NDELAY, LOG_AUTHPRIV);
 
 	if(daemonize)
 	{
