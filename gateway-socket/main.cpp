@@ -294,6 +294,13 @@ int main(int argc, char** argv)
 		gateway->addStaticIP(in_addr, mac_addr);
 	}
 
+	vector< struct userInfo > allUser = db->getAllUser(timeout);
+	for(vector< struct userInfo >::iterator iter = allUser.begin(); iter != allUser.end(); iter++)
+	{
+		gateway->addUserInfo(*info);
+	}
+
+
 	pthread_t main_thread;
 	pthread_t db_thread;
 

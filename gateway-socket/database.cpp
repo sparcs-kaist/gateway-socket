@@ -47,6 +47,7 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 	conn = 0;
 	selectMACwithIP = 0;
 	selectAllIP = 0;
+	selectAllUser = 0;
 	selectUserIPfromMAC = 0;
 	updateAccessTime = 0;
 
@@ -62,6 +63,7 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 
 		selectMACwithIP = conn->prepareStatement("SELECT `mac` FROM `static_ip` WHERE `ip` = ?");
 		selectAllIP = conn->prepareStatement("SELECT * FROM `static_ip`");
+		selectAllUser = conn->prepareStatement("SELECT * FROM `user`");
 		selectUserIPfromMAC = conn->prepareStatement("SELECT `ip` FROM `user` WHERE `mac` = ?");
 		updateAccessTime = conn->prepareStatement("UPDATE `user` SET `accessed` = ? WHERE `mac` = ?");
 	}
@@ -288,6 +290,31 @@ vector< pair<struct in_addr, struct ether_addr> > Database::getAllStaticIP()
 
 
 		ret.push_back( pair<struct in_addr, struct ether_addr> (addr, mac_addr));
+	}
+
+	result->close();
+	delete result;
+	return ret;
+}
+
+vector< struct userInfo > Database::getAllUser(uint64_t timeout)
+{
+	vector< struct userInfo > ret;
+	ResultSet * result = selectAllIP->executeQuery();
+
+	while(result->next())
+	{
+		SQLString ip_str = result->getString("ip");
+		SQLString mac_str = result->getString("mac");
+
+		struct userInfo info;
+
+		info.ip.s_addr = inet_addr(ip_str.c_str());
+		info.user_mac = Ethernet::readMAC(mac_str.c_str());
+		info.last_access = result->getInt64("accessed");
+		info.timeout = timeout;
+
+		ret.push_back(info);
 	}
 
 	result->close();

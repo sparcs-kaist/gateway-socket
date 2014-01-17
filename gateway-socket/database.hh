@@ -44,6 +44,7 @@ private:
 
 	sql::PreparedStatement* selectMACwithIP;
 	sql::PreparedStatement* selectAllIP;
+	sql::PreparedStatement* selectAllUser;
 	sql::PreparedStatement* selectUserIPfromMAC;
 	sql::PreparedStatement* updateAccessTime;
 
