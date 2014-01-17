@@ -84,6 +84,8 @@ int main(int argc, char** argv)
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
 	signal(SIGINT, exit_handle);
+	signal(SIGTERM, exit_handle);
+	signal(SIGQUIT, exit_handle);
 	char db_user[255];
 	char db_pass[255];
 	char db_name[255];
