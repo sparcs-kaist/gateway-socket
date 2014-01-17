@@ -90,6 +90,8 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 
 void Gateway::add_user(int fd, short what, void *arg)
 {
+	char ip_str[32];
+	char mac_str[32];
 	Gateway* gateway = (Gateway*)arg;
 	pthread_mutex_lock(&gateway->addUserLock);
 	eventfd_t v;
@@ -100,11 +102,17 @@ void Gateway::add_user(int fd, short what, void *arg)
 		struct userInfo* info = gateway->userAddRequest.front();
 		gateway->userAddRequest.pop();
 
-		if(gateway->userMap.find(info->ip.s_addr) != gateway->userMap.end())
-			gateway->userMap.erase(info->ip.s_addr);
+		UserMap::iterator iter = gateway->userMap.find(info->ip.s_addr);
+		if(iter != gateway->userMap.end())
+		{
+			inet_ntop(AF_INET, &iter->second->ip, ip_str, sizeof(ip_str));
+			Ethernet::printMAC(iter->second->user_mac, mac_str, sizeof(mac_str));
+			printf("Delete existing user IP(%s), MAC(%s)\n", ip_str, mac_str);
+			free(iter->second);
+			gateway->userMap.erase(iter);
+		}
 
-		char ip_str[32];
-		char mac_str[32];
+
 		inet_ntop(AF_INET, &info->ip, ip_str, sizeof(ip_str));
 		Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
 		printf("Added user IP(%s), MAC(%s)\n", ip_str, mac_str);
@@ -134,18 +142,12 @@ void Gateway::del_user(int fd, short what, void *arg)
 			char ip_str[32];
 			char mac_str[32];
 			inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str));
-			if(!info)
-			{
-				printf("Cannot find user info (%s) for removal\n", ip_str);
-			}
-			else
-			{
-				Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
-				printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
-				free(info);
-			}
-			if(gateway->userMap.size() > 0)
-				gateway->userMap.erase(ip.s_addr);
+
+			Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
+			printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
+			free(info);
+
+			gateway->userMap.erase(iter);
 		}
 	}
 
@@ -468,40 +470,6 @@ void Gateway::serve(void)
 				struct in_addr destIP = ip.getDestination();
 				struct in_addr srcIP = ip.getSource();
 
-				StaticIPMap::const_iterator destIter
-				= this->staticIPMap.find(destIP.s_addr);
-
-				StaticIPMap::const_iterator srcIter
-				= this->staticIPMap.find(srcIP.s_addr);
-
-				UserMap::const_iterator userIter
-				= this->userMap.find(srcIP.s_addr);
-
-				if(destIter != staticIPMap.end())
-				{
-					//printf("drop %d\n", __LINE__);//#DEBUG
-					continue; //we don't have to send it outside
-				}
-
-				if(userIter != userMap.end())
-				{
-					//change mac address
-					struct ether_addr source_mac = ethernet.getSource();
-					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
-					{
-						//printf("drop %d\n", __LINE__);//#DEBUG
-						continue; //unauthorized user is using ip
-					}
-					user = userIter->second;
-					ethernet.setSource(srcIter->second);
-				}
-				else if(srcIter != staticIPMap.end())
-				{
-					//printf("unauthorized user is using our ip %d\n", __LINE__);//#DEBUG
-					continue;
-				}
-
-
 				if(ip.getProtocol() == IPPROTO_UDP)
 				{
 					if( (memcmp(&IPv4_NONE, &srcIP, sizeof(struct in_addr)) == 0)
@@ -543,6 +511,39 @@ void Gateway::serve(void)
 							continue;
 						}
 					}
+				}
+
+				StaticIPMap::const_iterator destIter
+				= this->staticIPMap.find(destIP.s_addr);
+
+				StaticIPMap::const_iterator srcIter
+				= this->staticIPMap.find(srcIP.s_addr);
+
+				UserMap::const_iterator userIter
+				= this->userMap.find(srcIP.s_addr);
+
+				if(destIter != staticIPMap.end())
+				{
+					//printf("drop %d\n", __LINE__);//#DEBUG
+					continue; //we don't have to send it outside
+				}
+
+				if(userIter != userMap.end())
+				{
+					//change mac address
+					struct ether_addr source_mac = ethernet.getSource();
+					if(memcmp(&userIter->second->user_mac, &source_mac, sizeof(struct ether_addr)) != 0)
+					{
+						//printf("drop %d\n", __LINE__);//#DEBUG
+						continue; //unauthorized user is using ip
+					}
+					user = userIter->second;
+					ethernet.setSource(srcIter->second);
+				}
+				else if(srcIter != staticIPMap.end())
+				{
+					//printf("unauthorized user is using our ip %d\n", __LINE__);//#DEBUG
+					continue;
 				}
 			}
 			if(user)
@@ -690,6 +691,7 @@ void Gateway::serve(void)
 				else if(userIter != userMap.end())
 				{
 					//we don't have static IP anymore
+					free(userIter->second);
 					userMap.erase(userIter);
 					//TOOD free memory afterwards
 				}
