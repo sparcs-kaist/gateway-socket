@@ -1,0 +1,13 @@
+ethtool -K eth1 sg off
+ethtool -K eth1 tso off
+ethtool -K eth1 ufo off
+ethtool -K eth1 gso off
+ethtool -K eth1 gro off
+ethtool -K eth1 lro off
+
+ethtool -K eth2 sg off
+ethtool -K eth2 tso off
+ethtool -K eth2 ufo off
+ethtool -K eth2 gso off
+ethtool -K eth2 gro off
+ethtool -K eth2 lro off
