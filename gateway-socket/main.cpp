@@ -252,10 +252,11 @@ int main(int argc, char** argv)
 		for(fail = 0; fail < MYSQL_RETRY_COUNT; fail++)
 		{
 			FILE* mysql_pid = fopen("/var/run/mysqld/mysqld.pid","r");
-			if(mysql_pid == 0)
+			if(mysql_pid != 0)
 			{
+				int pid=0;
 				int count = fscanf(mysql_pid, "%d", &pid);
-				if(count != 1 && pid <= 0)
+				if(count == 1 && pid > 0)
 				{
 					syslog(LOG_INFO, "mysqld at pid %d is found", pid);
 					fclose(mysql_pid);
