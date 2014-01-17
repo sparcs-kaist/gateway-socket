@@ -300,7 +300,7 @@ vector< pair<struct in_addr, struct ether_addr> > Database::getAllStaticIP()
 vector< struct userInfo > Database::getAllUser(uint64_t timeout)
 {
 	vector< struct userInfo > ret;
-	ResultSet * result = selectAllIP->executeQuery();
+	ResultSet * result = selectAllUser->executeQuery();
 
 	while(result->next())
 	{
