@@ -222,7 +222,6 @@ int main(int argc, char** argv)
 
 		if (pid > 0)
 		{
-			syslog(LOG_INFO, "%s daemon pid %d", DAEMON_NAME, pid);
 			exit(0);
 		}
 
