@@ -297,7 +297,7 @@ int main(int argc, char** argv)
 	vector< struct userInfo > allUser = db->getAllUser(timeout);
 	for(vector< struct userInfo >::iterator iter = allUser.begin(); iter != allUser.end(); iter++)
 	{
-		gateway->addUserInfo(*info);
+		gateway->addUserInfo(*iter);
 	}
 
 
