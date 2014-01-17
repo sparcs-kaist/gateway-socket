@@ -10,7 +10,6 @@
 #include "gateway.hh"
 #include "ethernet.hh"
 #include "database.hh"
-#include <unistd.h>
 #include <arpa/inet.h>
 #include <iostream>
 #include <signal.h>
@@ -19,6 +18,10 @@
 #include <getopt.h>
 #include <string.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <syslog.h>
 
 using namespace std;
 
@@ -59,16 +62,24 @@ static void help(const char* name)
 			"--outside -o [outside device name]\n"
 			"--gateway [gateway IP]\n"
 			"--subnet [subnet IP]\n"
+			"-d daemonize\n"
 			"--dns [dns IP] [--dns another]\n"
 			"--timeout -t [timeout(milli)]\n"
 			"--help\n");
 	exit(1);
 }
 
+#define DAEMON_NAME "gateway"
+#define PID_FILE "/var/run/gateway.pid"
+
+
 int main(int argc, char** argv)
 {
+	static bool daemonize = false;
+	pid_t pid, sid;
+
 	int neccessary = 7;
-	int timeout = 15000;
+	int timeout = 10000;
 	char in_dev[IFNAMSIZ];
 	char out_dev[IFNAMSIZ];
 	signal(SIGINT, exit_handle);
@@ -92,6 +103,7 @@ int main(int argc, char** argv)
 			{"db-pass",   required_argument,       0, 'p'},
 			{"db-name",   required_argument,       0, 'n'},
 			{"timeout",   required_argument,       0, 't'},
+			{"daemon",   no_argument,       0, 'd'},
 			{"gateway",   required_argument,       &long_opt, 1},
 			{"subnet",   required_argument,       &long_opt, 2},
 			{"dns",   required_argument,       &long_opt, 3},
@@ -102,7 +114,7 @@ int main(int argc, char** argv)
 	while (1)
 	{
 		long_opt = 0;
-		int c = getopt_long (argc, argv, "u:p:i:o:n:t:",
+		int c = getopt_long (argc, argv, "u:p:i:o:n:t:d",
 				long_options, &option_index);
 
 		/* Detect the end of the options. */
@@ -166,6 +178,11 @@ int main(int argc, char** argv)
 				strncpy(db_pass, optarg, sizeof(db_pass));
 				break;
 			}
+			case 'd':
+			{
+				daemonize = true;
+				break;
+			}
 			case 't':
 			{
 				timeout = atoi(optarg);
@@ -188,6 +205,76 @@ int main(int argc, char** argv)
 	{
 		printf("Missing options (%d)\n", neccessary);
 		exit(1);
+	}
+
+	syslog(LOG_INFO, "%s daemon starting up", DAEMON_NAME);
+
+	setlogmask(LOG_UPTO(LOG_INFO));
+	openlog(DAEMON_NAME, LOG_CONS | LOG_PERROR, LOG_USER);
+
+	if(daemonize)
+	{
+		syslog(LOG_INFO, "starting the daemonizing process");
+
+		pid = fork();
+		if (pid < 0)
+		{
+			exit(1);
+		}
+
+		if (pid > 0)
+		{
+			exit(0);
+		}
+
+		umask(0);
+
+	}
+
+	if(daemonize)
+	{
+		sid = setsid();
+		if (sid < 0)
+		{
+			exit(1);
+		}
+
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
+	}
+
+
+	if(daemonize)
+	{
+		syslog(LOG_INFO, "starting the daemonizing process");
+
+		pid = fork();
+		if (pid < 0)
+		{
+			exit(1);
+		}
+
+		if (pid > 0)
+		{
+			exit(0);
+		}
+
+		umask(0);
+
+	}
+
+	if(daemonize)
+	{
+		sid = setsid();
+		if (sid < 0)
+		{
+			exit(1);
+		}
+
+		close(STDIN_FILENO);
+		close(STDOUT_FILENO);
+		close(STDERR_FILENO);
 	}
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
@@ -213,5 +300,7 @@ int main(int argc, char** argv)
 
 	delete gateway;
 	delete db;
+
+	syslog(LOG_INFO, "%s daemon exiting", DAEMON_NAME);
 	return 0;
 }
