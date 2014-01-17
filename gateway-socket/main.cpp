@@ -212,7 +212,7 @@ int main(int argc, char** argv)
 
 	if(daemonize)
 	{
-		syslog(LOG_INFO, "starting the daemonizing process");
+		printf("starting the daemonizing process\n");
 
 		pid = fork();
 		if (pid < 0)
@@ -222,40 +222,7 @@ int main(int argc, char** argv)
 
 		if (pid > 0)
 		{
-			exit(0);
-		}
-
-		umask(0);
-
-	}
-
-	if(daemonize)
-	{
-		sid = setsid();
-		if (sid < 0)
-		{
-			exit(1);
-		}
-
-		close(STDIN_FILENO);
-		close(STDOUT_FILENO);
-		close(STDERR_FILENO);
-	}
-
-
-	if(daemonize)
-	{
-		syslog(LOG_INFO, "starting the daemonizing process");
-
-		pid = fork();
-		if (pid < 0)
-		{
-			exit(1);
-		}
-
-		if (pid > 0)
-		{
-
+			printf("daemon pid: %d\n", pid);
 			exit(0);
 		}
 
