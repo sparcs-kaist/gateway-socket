@@ -296,7 +296,6 @@ void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
 	int current_offset = 0;
 	if(packet->getLength() < (int)(sizeof(struct ether_header) + sizeof(struct ip) + 8))
 	{
-		printf("plen %d\n", packet->getLength());
 		return;
 	}
 
@@ -304,7 +303,6 @@ void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
 	Ethernet r_ethernet(packet);
 	if(r_ethernet.getProtocol() != ETHERTYPE_IP)
 	{
-		printf("proto %d\n", r_ethernet.getProtocol());
 		return;
 	}
 
@@ -312,7 +310,6 @@ void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
 	int ip_hlen = r_ip.getNextOffset() - sizeof(struct ether_header);
 	if(ip_hlen != 20)
 	{
-		printf("hlen %d\n", ip_hlen);
 		return;
 	}
 
@@ -359,7 +356,6 @@ void Gateway::icmp_mtu(Device* dev, Packet* packet, uint16_t MTU)
 	current_offset += sizeof(struct icmp_too_big);
 
 	dev->writePacket(s_packet.inMemory, s_packet.getLength());
-	printf("ICMP sent.\n");
 	/* END OF IP */
 }
 
@@ -387,7 +383,7 @@ void Gateway::serve(void)
 			if(readLen > MY_PACKET_LEN)
 			{
 				inPacket.setLength(MY_PACKET_LEN);
-				printf("Too long packet(%d) received from inside, send ICMP\n", readLen);
+				//printf("Too long packet(%d) received from inside, send ICMP\n", readLen);
 				icmp_mtu(inDev, &inPacket, MY_MTU);
 				continue;
 			}
@@ -570,7 +566,7 @@ void Gateway::serve(void)
 			if(readLen > MY_PACKET_LEN)
 			{
 				outPacket.setLength(MY_PACKET_LEN);
-				printf("Too long packet(%d) received from outside, send ICMP\n", readLen);
+				//printf("Too long packet(%d) received from outside, send ICMP\n", readLen);
 				icmp_mtu(outDev, &outPacket, MY_MTU);
 				continue;
 			}
