@@ -23,10 +23,13 @@
 #include <unistd.h>
 #include <syslog.h>
 
+#define MYSQL_RETRY_COUNT 30
+#define MYSQL_FINAL_WAIT 5
+
 using namespace std;
 
-static Gateway* gateway;
-static Database *db;
+static Gateway* gateway = 0;
+static Database *db = 0;
 
 static void exit_handle(int num)
 {
@@ -62,7 +65,7 @@ static void help(const char* name)
 			"--outside -o [outside device name]\n"
 			"--gateway [gateway IP]\n"
 			"--subnet [subnet IP]\n"
-			"-d daemonize\n"
+			"--daemon -d daemonize\n"
 			"--dns [dns IP] [--dns another]\n"
 			"--timeout -t [timeout(milli)]\n"
 			"--help\n");
@@ -89,8 +92,8 @@ int main(int argc, char** argv)
 	static int long_opt;
 	int option_index;
 
-	struct in_addr gatewayIP;
-	struct in_addr subnetMask;
+	struct in_addr gatewayIP = {0};
+	struct in_addr subnetMask = {0};
 	vector<struct in_addr> dnsList;
 
 	static struct option long_options[] =
@@ -185,7 +188,7 @@ int main(int argc, char** argv)
 			{
 				timeout = atoi(optarg);
 				if(timeout < 0)
-					timeout = 15000;
+					timeout = 10000;
 				break;
 			}
 			case 'n':
@@ -241,6 +244,39 @@ int main(int argc, char** argv)
 		close(STDIN_FILENO);
 		close(STDOUT_FILENO);
 		close(STDERR_FILENO);
+	}
+
+
+	{
+		int fail = 0;
+		for(fail = 0; fail < MYSQL_RETRY_COUNT; fail++)
+		{
+			FILE* mysql_pid = fopen("/var/run/mysqld/mysqld.pid","r");
+			if(mysql_pid == 0)
+			{
+				int count = fscanf(mysql_pid, "%d", &pid);
+				if(count != 1 && pid <= 0)
+				{
+					syslog(LOG_INFO, "mysqld at pid %d is found", pid);
+					fclose(mysql_pid);
+					break;
+				}
+			}
+			syslog(LOG_WARNING, "cannot find mysqld (try %d/%d)", fail+1, MYSQL_RETRY_COUNT);
+			sleep(1);
+			if(mysql_pid != 0)
+				fclose(mysql_pid);
+		}
+		if(fail >= MYSQL_RETRY_COUNT)
+		{
+			syslog(LOG_ERR, "cannot find mysqld on /var/run/mysqld/mysqld.pid");
+			exit(1);
+		}
+		else
+		{
+			syslog(LOG_INFO, "wait %d more seconds to complete the job", MYSQL_FINAL_WAIT);
+			sleep(MYSQL_FINAL_WAIT);
+		}
 	}
 
 	db = new Database("localhost", db_user, db_pass, db_name, gatewayIP, subnetMask, dnsList, timeout);
