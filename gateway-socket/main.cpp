@@ -70,8 +70,6 @@ static void help(const char* name)
 }
 
 #define DAEMON_NAME "gateway"
-#define PID_FILE "/var/run/gateway.pid"
-
 
 int main(int argc, char** argv)
 {
@@ -224,6 +222,7 @@ int main(int argc, char** argv)
 
 		if (pid > 0)
 		{
+			syslog(LOG_INFO, "%s daemon pid %d", DAEMON_NAME, pid);
 			exit(0);
 		}
 
@@ -257,6 +256,7 @@ int main(int argc, char** argv)
 
 		if (pid > 0)
 		{
+
 			exit(0);
 		}
 
