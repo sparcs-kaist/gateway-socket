@@ -75,6 +75,7 @@ public:
 	~Database();
 
 	std::vector< std::pair<struct in_addr, struct ether_addr> > getAllStaticIP();
+	std::vector< struct userInfo > getAllUser(uint64_t timeout);
 
 	void createDHCP(const struct dhcp_request &request);
 	void updateTime(const struct update_time &request);
