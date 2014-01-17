@@ -22,7 +22,9 @@ class Gateway;
 struct update_time
 {
 	struct ether_addr mac;
+	struct in_addr ip;
 	uint64_t UTC;
+	Gateway* gateway;
 };
 
 struct dhcp_request

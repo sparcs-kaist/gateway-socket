@@ -136,17 +136,22 @@ void Database::update_time(int fd, short what, void *arg)
 
 		Ethernet::printMAC(request.mac, mac_buf, sizeof(mac_buf));
 
+		int ret = 0;
 		try
 		{
 			database->updateAccessTime->clearParameters();
 			database->updateAccessTime->setUInt64(1, request.UTC);
 			database->updateAccessTime->setString(2, mac_buf);
-			database->updateAccessTime->executeUpdate();
+			ret = database->updateAccessTime->executeUpdate();
 		}
 		catch(sql::SQLException &e)
 		{
 			printf("SQL error on updating time(%d): %s\n", e.getErrorCode(), e.getSQLStateCStr());
-			exit(1);
+		}
+		if(ret == 0)
+		{
+			printf("User removed from the database, MAC(%s)\n", mac_buf);
+			request.gateway->delUserInfo(request.ip);
 		}
 	}
 }

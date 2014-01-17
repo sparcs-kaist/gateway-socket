@@ -553,7 +553,9 @@ void Gateway::serve(void)
 					user->last_access = current_time;
 					struct update_time request;
 					request.mac = user->user_mac;
+					request.ip = user->ip;
 					request.UTC = current_time;
+					request.gateway = this;
 					db->updateTime(request);
 				}
 			}
