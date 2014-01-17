@@ -25,6 +25,7 @@
 #include <queue>
 #include <arpa/inet.h>
 #include <netinet/ip_icmp.h>
+#include <syslog.h>
 
 using namespace std;
 using namespace boost;
@@ -34,8 +35,7 @@ typedef unordered_map<uint32_t,struct userInfo*> UserMap;
 
 static void terminate_gateway(int fd, short what, void *arg)
 {
-	printf("Terminating gateway...\n");
-	fflush(0);
+	syslog(LOG_INFO, "Terminating gateway...");
 	eventfd_t v;
 	eventfd_read(fd, &v);
 	struct event_base* evbase = (struct event_base*) arg;
@@ -61,7 +61,7 @@ void Gateway::add_static_ip(int fd, short what, void *arg)
 		char mac_str[32];
 		inet_ntop(AF_INET, &data.first, ip_str, sizeof(ip_str));
 		Ethernet::printMAC(data.second, mac_str, sizeof(mac_str));
-		printf("Inserted new static IP (%s) for MAC (%s)\n", ip_str, mac_str);
+		syslog(LOG_INFO, "Inserted new static IP (%s) for MAC (%s)", ip_str, mac_str);
 	}
 	pthread_mutex_unlock(&gateway->addStaticIPLock);
 }
@@ -81,9 +81,9 @@ void Gateway::del_static_ip(int fd, short what, void *arg)
 		char ip_str[32];
 		inet_ntop(AF_INET, &key, ip_str, sizeof(ip_str));
 		if(result)
-			printf("Removed static IP (%s)\n", ip_str);
+			syslog(LOG_INFO, "Removed static IP (%s)", ip_str);
 		else
-			printf("Cannot find static IP (%s) for removal\n", ip_str);
+			syslog(LOG_INFO, "Cannot find static IP (%s) for removal", ip_str);
 	}
 	pthread_mutex_unlock(&gateway->delStaticIPLock);
 }
@@ -107,7 +107,7 @@ void Gateway::add_user(int fd, short what, void *arg)
 		{
 			inet_ntop(AF_INET, &iter->second->ip, ip_str, sizeof(ip_str));
 			Ethernet::printMAC(iter->second->user_mac, mac_str, sizeof(mac_str));
-			printf("Delete existing user IP(%s), MAC(%s)\n", ip_str, mac_str);
+			syslog(LOG_INFO, "Delete existing user IP(%s), MAC(%s)", ip_str, mac_str);
 			free(iter->second);
 			gateway->userMap.erase(iter);
 		}
@@ -115,7 +115,7 @@ void Gateway::add_user(int fd, short what, void *arg)
 
 		inet_ntop(AF_INET, &info->ip, ip_str, sizeof(ip_str));
 		Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
-		printf("Added user IP(%s), MAC(%s)\n", ip_str, mac_str);
+		syslog(LOG_INFO, "Added user IP(%s), MAC(%s)", ip_str, mac_str);
 
 		gateway->userMap.insert(pair<uint32_t, struct userInfo*>(info->ip.s_addr, info));
 
@@ -144,7 +144,7 @@ void Gateway::del_user(int fd, short what, void *arg)
 			inet_ntop(AF_INET, &ip, ip_str, sizeof(ip_str));
 
 			Ethernet::printMAC(info->user_mac, mac_str, sizeof(mac_str));
-			printf("Removed user IP(%s), MAC(%s)\n", ip_str, mac_str);
+			syslog(LOG_INFO, "Removed user IP(%s), MAC(%s)", ip_str, mac_str);
 			free(info);
 
 			gateway->userMap.erase(iter);
@@ -187,39 +187,39 @@ Gateway::Gateway(const char* inDev, const char* outDev, Database* db)
 	termEventFD = eventfd(0,0);
 	if(termEventFD < 0)
 	{
-		printf("cannot create term event\n");
+		syslog(LOG_ERR, "cannot create term event");
 		exit(1);
 	}
 	addStaticIPEventFD = eventfd(0,0);
 	if(addStaticIPEventFD < 0)
 	{
-		printf("cannot create add event\n");
+		syslog(LOG_ERR, "cannot create add event");
 		exit(1);
 	}
 	delStaticIPEventFD = eventfd(0,0);
 	if(delStaticIPEventFD < 0)
 	{
-		printf("cannot create del event\n");
+		syslog(LOG_ERR, "cannot create del event");
 		exit(1);
 	}
 	addUserEventFD = eventfd(0,0);
 	if(addUserEventFD < 0)
 	{
-		printf("cannot create add user event\n");
+		syslog(LOG_ERR, "cannot create add user event");
 		exit(1);
 	}
 
 	delUserEventFD = eventfd(0,0);
 	if(delUserEventFD < 0)
 	{
-		printf("cannot create del user event\n");
+		syslog(LOG_ERR, "cannot create del user event");
 		exit(1);
 	}
 
 	sendPacketFD = eventfd(0,0);
 	if(sendPacketFD < 0)
 	{
-		printf("cannot create del user event\n");
+		syslog(LOG_ERR, "cannot create del user event");
 		exit(1);
 	}
 

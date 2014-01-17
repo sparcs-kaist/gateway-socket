@@ -30,7 +30,7 @@ static Database *db;
 
 static void exit_handle(int num)
 {
-	printf("Exiting...\n");
+	syslog(LOG_INFO, "Exiting...\n");
 	fflush(0);
 
 	gateway->terminate();

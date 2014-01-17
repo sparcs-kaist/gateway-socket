@@ -21,13 +21,14 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <sys/eventfd.h>
+#include <syslog.h>
 
 using namespace std;
 using namespace sql;
 
 static void terminate_database(int fd, short what, void *arg)
 {
-	printf("Terminating database...\n");
+	syslog(LOG_INFO, "Terminating database...");
 	fflush(0);
 	eventfd_t v;
 	eventfd_read(fd, &v);
@@ -66,28 +67,28 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 	}
 	catch(sql::SQLException &e)
 	{
-		printf("SQL error on creating database(%d): %s\n", e.getErrorCode(), e.getSQLStateCStr());
+		syslog(LOG_ERR, "SQL error on creating database(%d): %s", e.getErrorCode(), e.getSQLStateCStr());
 		exit(1);
 	}
 
 	termEventFD = eventfd(0,0);
 	if(termEventFD < 0)
 	{
-		printf("cannot create term event\n");
+		syslog(LOG_ERR, "cannot create term event");
 		exit(1);
 	}
 
 	createDHCPRequestFD = eventfd(0,0);
 	if(createDHCPRequestFD < 0)
 	{
-		printf("cannot create dhcp event.\n");
+		syslog(LOG_ERR, "cannot create dhcp event.");
 		exit(1);
 	}
 
 	updateTimeFD = eventfd(0,0);
 	if(updateTimeFD < 0)
 	{
-		printf("cannot update time event.\n");
+		syslog(LOG_ERR, "cannot update time event.");
 		exit(1);
 	}
 
@@ -146,11 +147,11 @@ void Database::update_time(int fd, short what, void *arg)
 		}
 		catch(sql::SQLException &e)
 		{
-			printf("SQL error on updating time(%d): %s\n", e.getErrorCode(), e.getSQLStateCStr());
+			syslog(LOG_ERR, "SQL error on updating time(%d): %s", e.getErrorCode(), e.getSQLStateCStr());
 		}
 		if(ret == 0)
 		{
-			printf("User removed from the database, MAC(%s)\n", mac_buf);
+			syslog(LOG_INFO, "User removed from the database, MAC(%s)", mac_buf);
 			request.gateway->delUserInfo(request.ip);
 		}
 	}
@@ -181,7 +182,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 	{
 		struct dhcp_request request = *iter;
 		Ethernet::printMAC(request.mac, mac_buf, sizeof(mac_buf));
-		printf("DHCP received: MAC(%s), ID(%X)\n", mac_buf, ntohl(request.transID));
+		syslog(LOG_INFO, "DHCP received: MAC(%s), ID(%X)", mac_buf, ntohl(request.transID));
 		try
 		{
 			database->selectUserIPfromMAC->clearParameters();
@@ -237,7 +238,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 
 					if(!request.isDiscover)
 					{
-						printf("DHCP accepted: MAC(%s), IP(%s)\n", mac_buf, ip_str.c_str());
+						syslog(LOG_INFO, "DHCP accepted: MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
 						request.gateway->addUserInfo(userInfo);
 					}
 					request.gateway->sendPacketRequest(packet);
@@ -251,7 +252,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 		}
 		catch(sql::SQLException &e)
 		{
-			printf("SQL error on creating dhcp(%d): %s\n", e.getErrorCode(), e.getSQLStateCStr());
+			syslog(LOG_ERR, "SQL error on creating dhcp(%d): %s", e.getErrorCode(), e.getSQLStateCStr());
 			exit(1);
 		}
 	}

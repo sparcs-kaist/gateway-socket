@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include "gateway.hh"
+#include <syslog.h>
 
 Device::Device(const char* devName)
 {
@@ -34,6 +35,7 @@ Device::Device(const char* devName)
 	if(sock < 0)
 	{
 		perror("cannot open packet socket");
+		syslog(LOG_ERR, "%s: cannot open packet socket", devName);
 		exit(1);
 	}
 
@@ -47,7 +49,8 @@ Device::Device(const char* devName)
 
 	if(ioctl(sock, SIOCGIFFLAGS, &request) < 0)
 	{
-		perror ("cannot get dev info");
+		perror("cannot get dev info");
+		syslog(LOG_ERR, "%s: cannot get dev info", devName);
 		close(sock);
 		exit(1);
 	}
@@ -58,7 +61,8 @@ Device::Device(const char* devName)
 	request.ifr_flags = IFF_UP | IFF_BROADCAST | IFF_NOARP | IFF_NOTRAILERS | IFF_PROMISC | IFF_POINTOPOINT;
 	if(ioctl(sock, SIOCSIFFLAGS, &request) < 0)
 	{
-		perror ("cannot set dev");
+		perror("cannot set dev");
+		syslog(LOG_ERR, "%s: cannot set dev flag", devName);
 		close(sock);
 		exit(1);
 	}
@@ -67,36 +71,39 @@ Device::Device(const char* devName)
 
 	if (ioctl(sock, SIOCSIFMTU, &request) < 0)
 	{
-		perror ("cannot set mtu");
+		perror("cannot set mtu");
+		syslog(LOG_ERR, "%s: cannot set mtu", devName);
 		close(sock);
 		exit(1);
 	}
 
 	if (ioctl(sock, SIOCGIFMTU, &request) < 0)
 	{
-		perror ("cannot get mtu");
+		perror("cannot get mtu");
+		syslog(LOG_ERR, "%s: cannot get mtu", devName);
 		close(sock);
 		exit(1);
 	}
-	printf("MTU %d\n", request.ifr_ifindex);
+	syslog(LOG_INFO, "MTU %d\n", request.ifr_ifindex);
 
 	if (ioctl(sock, SIOCGIFINDEX, &request) < 0)
 	{
-		perror ("cannot get dev index");
+		perror("cannot get dev index");
+		syslog(LOG_ERR, "%s: cannot get dev idx", devName);
 		close(sock);
 		exit(1);
 	}
 	devID = request.ifr_ifindex;
-	printf("DEV %d\n", request.ifr_ifindex);
+	syslog(LOG_INFO, "DEV %d\n", request.ifr_ifindex);
 
 	int val = 0;
 	socklen_t len = sizeof(val);
 	getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &val, &len);
-	printf("send buf %d\n", val);
+	syslog(LOG_INFO, "%s: send buf %d\n", devName, val);
 	val = 0;
 	len = sizeof(val);
 	getsockopt(sock, SOL_SOCKET, SO_RCVBUF, &val, &len);
-	printf("recv buf %d\n", val);
+	syslog(LOG_INFO, "%s: recv buf %d\n", devName, val);
 
 	struct sockaddr_ll eth;
 	memset(&eth, 0, sizeof(eth));
@@ -111,7 +118,8 @@ Device::Device(const char* devName)
 	eth.sll_halen = ETH_ALEN;
 	if(bind(sock, (struct sockaddr*)&eth, sizeof(eth)) < 0)
 	{
-		perror ("cannot bind dev");
+		perror("cannot bind dev");
+		syslog(LOG_ERR, "%s: cannot bind dev", devName);
 		close(sock);
 		exit(1);
 	}
@@ -126,7 +134,7 @@ Device::~Device()
 		memset(&request, 0, sizeof(request));
 
 		strncpy(request.ifr_name, devName, IFNAMSIZ);
-		printf("recover prev setting of %s\n", request.ifr_name);
+		syslog(LOG_INFO, "recover prev setting of %s\n", request.ifr_name);
 		request.ifr_flags = prevFlag;
 		ioctl(sock, SIOCSIFFLAGS, &request);
 
@@ -154,7 +162,7 @@ int Device::readPacket(void* buffer, int length)
 		if(readByte < 0)
 			return readByte;
 		if(eth.sll_hatype != ARPHRD_ETHER)
-			printf("new hardware %d\n", eth.sll_hatype);
+			continue;
 		if(len > sizeof(eth))
 			continue;
 		if(eth.sll_ifindex != this->devID)
