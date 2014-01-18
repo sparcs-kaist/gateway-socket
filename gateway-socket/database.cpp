@@ -209,7 +209,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 					SQLString mac_str = result2->getString("mac");
 
 
-					struct ether_addr gateway_mac = Ethernet::readMAC(mac_str.c_str());
+					struct ether_addr gateway_mac = Ethernet::readMAC("AB:CD:EF:12:34:56");
 					Packet* packet = new Packet(MY_PACKET_LEN);
 					packet->setLength(MY_PACKET_LEN);
 
