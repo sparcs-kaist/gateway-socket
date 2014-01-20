@@ -237,10 +237,10 @@ void Database::create_dhcp(int fd, short what, void *arg)
 						if(usingIP->first())
 						{
 							found = true;
-							SQLString usingIPStr = usingIP->getString("ip");
+							ip_str = usingIP->getString("ip");
 							database->deleteDynamic->clearParameters();
-							database->deleteDynamic->setString(1, usingIPStr);
-							ip_addr.s_addr = inet_addr(usingIPStr->c_str());
+							database->deleteDynamic->setString(1, ip_str);
+							ip_addr.s_addr = inet_addr(ip_str->c_str());
 						}
 						else
 						{
