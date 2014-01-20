@@ -217,7 +217,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 					if(emptyIP->first())
 					{
 						found = true;
-						SQLString ip_str = emptyIP->getString("ip");
+						ip_str = emptyIP->getString("ip");
 						ip_addr.s_addr = inet_addr(ip_str.c_str());
 						syslog(LOG_INFO, "DHCP for dynamic MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
 					}
