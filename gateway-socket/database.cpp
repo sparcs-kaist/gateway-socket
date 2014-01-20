@@ -50,6 +50,11 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 	selectAllUser = 0;
 	selectUserIPfromMAC = 0;
 	updateAccessTime = 0;
+	selectUnusedDynamicIP = 0;
+	selectUsingDynamicIP = 0;
+
+	deleteDynamic = 0;
+	insertDynamic = 0;
 
 	this->gatewayIP = gatewayIP;
 	this->subnetMask = subnetMask;
@@ -63,9 +68,15 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 
 		selectMACwithIP = conn->prepareStatement("SELECT `mac` FROM `static_ip` WHERE `ip` = ?");
 		selectAllIP = conn->prepareStatement("SELECT * FROM `static_ip`");
-		selectAllUser = conn->prepareStatement("SELECT * FROM `user`");
+		selectAllUser = conn->prepareStatement("SELECT * FROM `user` WHERE `ip` IS NOT NULL");
 		selectUserIPfromMAC = conn->prepareStatement("SELECT `ip` FROM `user` WHERE `mac` = ?");
 		updateAccessTime = conn->prepareStatement("UPDATE `user` SET `accessed` = ? WHERE `mac` = ?");
+
+		selectUnusedDynamicIP = conn->prepareStatement("SELECT `S`.`ip` FROM `static_ip` AS `S` WHERE `S`.isStatic = FALSE AND (SELECT COUNT(`ip`) FROM `user` AS `U` WHERE `U`.`ip` = `S`.`ip`) = 0");
+		selectUsingDynamicIP = conn->prepareStatement("SELECT `S`.`ip` FROM `static_ip` AS `S`, `user` AS `U` WHERE (`S`.isStatic = FALSE) AND (`S`.`ip` = `U`.`ip`) AND (`U`.`accessed` < ?) ORDER BY `U`.`accessed` ASC");
+
+		deleteDynamic = conn->prepareStatement("UPDATE `user` SET `ip` = NULL WHERE `ip` = ?");
+		insertDynamic = conn->prepareStatement("UPDATE `user` SET `ip` = %s WHERE `mac` = ?");
 	}
 	catch(sql::SQLException &e)
 	{
@@ -196,57 +207,108 @@ void Database::create_dhcp(int fd, short what, void *arg)
 			if(result->first())
 			{
 				SQLString ip_str = result->getString("ip");
-
 				struct in_addr ip_addr;
-				ip_addr.s_addr = inet_addr(ip_str.c_str());
-
-				database->selectMACwithIP->clearParameters();
-				database->selectMACwithIP->setString(1, ip_str);
-
-				ResultSet* result2 = database->selectMACwithIP->executeQuery();
-				if(result2->first())
+				bool found = false;
+				if(ip_str.length() == 0)
 				{
-					SQLString mac_str = result2->getString("mac");
-
-
-					struct ether_addr gateway_mac = Ethernet::readMAC("78:19:f7:58:30:01");
-					Packet* packet = new Packet(MY_PACKET_LEN);
-					packet->setLength(MY_PACKET_LEN);
-
-					Packet dhcp(MY_PACKET_LEN);
-					dhcp.setLength(MY_PACKET_LEN - UDP::totalHeaderLen);
-					int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.isDiscover,
-							htons(request.mtu),
-							request.transID,
-							ip_addr, request.mac,
-							database->gatewayIP,
-							database->subnetMask,
-							database->gatewayIP,
-							database->dnsList, 14400);
-					dhcp.setLength(dhcpLen);
-
-					int udpLen = UDP::makePacket(packet, gateway_mac, request.mac,
-							database->gatewayIP,
-							ip_addr,
-							67,
-							68, dhcp.inMemory, dhcp.getLength());
-					packet->setLength(udpLen);
-
-					struct userInfo userInfo;
-					userInfo.ip = ip_addr;
-					userInfo.last_access = 0;
-					userInfo.timeout = database->timeout;
-					userInfo.user_mac = request.mac;
-
-					if(!request.isDiscover)
+					//dynamic IP
+					ResultSet* emptyIP = database->selectUnusedDynamicIP->executeQuery();
+					if(emptyIP->first())
 					{
-						syslog(LOG_INFO, "DHCP accepted: MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
-						request.gateway->addUserInfo(userInfo);
+						found = true;
+						SQLString ip_str = emptyIP->getString("ip");
+						ip_addr.s_addr = inet_addr(ip_str.c_str());
+						syslog(LOG_INFO, "DHCP for dynamic MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
 					}
-					request.gateway->sendPacketRequest(packet);
+					else
+					{
+						//release used IP
+						struct timeval temp_time;
+						uint64_t current_time = 0;
+						gettimeofday(&temp_time, 0);
+						current_time = (temp_time.tv_sec * 1000) + (temp_time.tv_usec / 1000);
+						current_time -= 1000* DHCP_TIMEOUT;
+
+						ResultSet* usingIP = database->selectUsingDynamicIP->executeQuery();
+
+						if(usingIP->first())
+						{
+							found = true;
+							SQLString usingIPStr = usingIP->getString("ip");
+							database->deleteDynamic->clearParameters();
+							database->deleteDynamic->setString(1, usingIPStr);
+							ip_addr.s_addr = inet_addr(usingIPStr->c_str());
+						}
+						else
+						{
+							syslog(LOG_INFO, "No available IP for DHCP request MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
+						}
+
+						usingIP->close();
+						delete usingIP;
+					}
+					emptyIP->close();
+					delete emptyIP;
 				}
-				result2->close();
-				delete result2;
+				else
+				{
+					ip_addr.s_addr = inet_addr(ip_str.c_str());
+					found = true;
+				}
+
+				if(found)
+				{
+					database->selectMACwithIP->clearParameters();
+					database->selectMACwithIP->setString(1, ip_str);
+
+					ResultSet* result2 = database->selectMACwithIP->executeQuery();
+					if(result2->first())
+					{
+						//SQLString mac_str = result2->getString("mac");
+
+
+						struct ether_addr gateway_mac = Ethernet::readMAC("78:19:f7:58:30:01");
+						Packet* packet = new Packet(MY_PACKET_LEN);
+						packet->setLength(MY_PACKET_LEN);
+
+						Packet dhcp(MY_PACKET_LEN);
+						dhcp.setLength(MY_PACKET_LEN - UDP::totalHeaderLen);
+						int dhcpLen = DHCP::writeResponse(&dhcp, 0, request.isDiscover,
+								htons(request.mtu),
+								request.transID,
+								ip_addr, request.mac,
+								database->gatewayIP,
+								database->subnetMask,
+								database->gatewayIP,
+								database->dnsList, DHCP_TIMEOUT);
+						dhcp.setLength(dhcpLen);
+
+						int udpLen = UDP::makePacket(packet, gateway_mac, request.mac,
+								database->gatewayIP,
+								ip_addr,
+								67,
+								68, dhcp.inMemory, dhcp.getLength());
+						packet->setLength(udpLen);
+
+						struct userInfo userInfo;
+						userInfo.ip = ip_addr;
+						userInfo.last_access = 0;
+						userInfo.timeout = database->timeout;
+						userInfo.user_mac = request.mac;
+
+						if(!request.isDiscover)
+						{
+							syslog(LOG_INFO, "DHCP accepted: MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
+							database->insertDynamic->clearParameters();
+							database->insertDynamic->setString(1, mac_buf);
+							database->insertDynamic->executeUpdate();
+							request.gateway->addUserInfo(userInfo);
+						}
+						request.gateway->sendPacketRequest(packet);
+					}
+					result2->close();
+					delete result2;
+				}
 			}
 
 			result->close();
@@ -264,8 +326,15 @@ Database::~Database()
 {
 	delete selectMACwithIP;
 	delete selectAllIP;
+	delete selectAllUser;
 	delete selectUserIPfromMAC;
 	delete updateAccessTime;
+
+	delete insertDynamic;
+	delete deleteDynamic;
+
+	delete selectUnusedDynamicIP;
+	delete selectUsingDynamicIP;
 
 	close(createDHCPRequestFD);
 	pthread_mutex_destroy(&this->createDHCPRequestLock);

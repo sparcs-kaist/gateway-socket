@@ -47,6 +47,11 @@ private:
 	sql::PreparedStatement* selectAllUser;
 	sql::PreparedStatement* selectUserIPfromMAC;
 	sql::PreparedStatement* updateAccessTime;
+	sql::PreparedStatement* selectUnusedDynamicIP;
+	sql::PreparedStatement* selectUsingDynamicIP;
+
+	sql::PreparedStatement* insertDynamic;
+	sql::PreparedStatement* deleteDynamic;
 
 	struct event_base* evbase;
 	uint32_t timeout;
