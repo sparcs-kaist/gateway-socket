@@ -76,7 +76,7 @@ Database::Database(const char* host, const char* userName, const char* passwd, c
 		selectUsingDynamicIP = conn->prepareStatement("SELECT `S`.`ip` FROM `static_ip` AS `S`, `user` AS `U` WHERE (`S`.isStatic = FALSE) AND (`S`.`ip` = `U`.`ip`) AND (`U`.`accessed` < ?) ORDER BY `U`.`accessed` ASC");
 
 		deleteDynamic = conn->prepareStatement("UPDATE `user` SET `ip` = NULL WHERE `ip` = ?");
-		insertDynamic = conn->prepareStatement("UPDATE `user` SET `ip` = %s WHERE `mac` = ?");
+		insertDynamic = conn->prepareStatement("UPDATE `user` SET `ip` = ? WHERE `mac` = ?");
 	}
 	catch(sql::SQLException &e)
 	{
@@ -303,7 +303,8 @@ void Database::create_dhcp(int fd, short what, void *arg)
 						{
 							syslog(LOG_INFO, "DHCP accepted: MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
 							database->insertDynamic->clearParameters();
-							database->insertDynamic->setString(1, mac_buf);
+							database->insertDynamic->setString(1, ip_str);
+							database->insertDynamic->setString(2, mac_buf);
 							database->insertDynamic->executeUpdate();
 							request.gateway->addUserInfo(userInfo);
 						}
