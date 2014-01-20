@@ -230,6 +230,8 @@ void Database::create_dhcp(int fd, short what, void *arg)
 						current_time = (temp_time.tv_sec * 1000) + (temp_time.tv_usec / 1000);
 						current_time -= 1000* DHCP_TIMEOUT;
 
+						database->selectUsingDynamicIP->clearParameters();
+						database->selectUserIPfromMAC->setUInt64(1, current_time);
 						ResultSet* usingIP = database->selectUsingDynamicIP->executeQuery();
 
 						if(usingIP->first())
