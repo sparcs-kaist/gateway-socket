@@ -261,6 +261,10 @@ void Database::create_dhcp(int fd, short what, void *arg)
 
 				if(found)
 				{
+					database->insertDynamic->clearParameters();
+					database->insertDynamic->setString(1, ip_str);
+					database->insertDynamic->setString(2, mac_buf);
+					database->insertDynamic->executeUpdate();
 					database->selectMACwithIP->clearParameters();
 					database->selectMACwithIP->setString(1, ip_str);
 
@@ -302,10 +306,6 @@ void Database::create_dhcp(int fd, short what, void *arg)
 						if(!request.isDiscover)
 						{
 							syslog(LOG_INFO, "DHCP accepted: MAC(%s), IP(%s)", mac_buf, ip_str.c_str());
-							database->insertDynamic->clearParameters();
-							database->insertDynamic->setString(1, ip_str);
-							database->insertDynamic->setString(2, mac_buf);
-							database->insertDynamic->executeUpdate();
 							request.gateway->addUserInfo(userInfo);
 						}
 						request.gateway->sendPacketRequest(packet);
