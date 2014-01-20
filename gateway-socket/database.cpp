@@ -208,6 +208,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 			{
 				SQLString ip_str = result->getString("ip");
 				struct in_addr ip_addr;
+				ip_addr.s_addr = 0;
 				bool found = false;
 				if(ip_str.length() == 0)
 				{
