@@ -240,6 +240,7 @@ void Database::create_dhcp(int fd, short what, void *arg)
 							ip_str = usingIP->getString("ip");
 							database->deleteDynamic->clearParameters();
 							database->deleteDynamic->setString(1, ip_str);
+							database->deleteDynamic->executeUpdate();
 							ip_addr.s_addr = inet_addr(ip_str->c_str());
 						}
 						else
