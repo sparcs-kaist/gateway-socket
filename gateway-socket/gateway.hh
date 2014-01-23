@@ -17,7 +17,7 @@
 #include <queue>
 
 #define MY_MTU ETH_DATA_LEN
-#define MY_PACKET_LEN (ETH_FRAME_LEN+128)
+#define MY_PACKET_LEN (ETH_FRAME_LEN)
 #define IO_BURST 32
 #define DHCP_TIMEOUT 7200
 
